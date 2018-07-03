@@ -4,7 +4,9 @@
            :unknown-op-error
            :malformed-error
            :malformed-let-error
+           :env-define
            :env-symbol-position
+           :env-stack-position
            :env-push-binding
            :env-pop-bindings
            :read-number
@@ -22,14 +24,16 @@
            :ptr-write-float
            :ptr-write-string
            :ptr-read-string
-           :ptr-find-string
+           :ptr-find-string=
            :symbol-string
+           :symbol-id
            :space?
            :null?
            :symbol-char?
            :special?
            :alpha?
            :digit?
+           :special-form?
            :index-of
            :test
            :test-read-token
@@ -41,6 +45,10 @@
            :test-compile-lambda
            :test-compile-named-lambda
            :test-compile-set-lambda
+           :test-compile-if
+           :test-compile-asm
+           :test-write-to-array
+           :test-write
            :string=
            :repl-read
            :make-op
@@ -49,6 +57,8 @@
            :emit-lookup-call
            :emit-value
            :repl-compile
+           :write-to-array
+           :write-to-file
            ))
 
 (in-package :repl)
@@ -59,12 +69,12 @@
   (:report (lambda (condition stream)
              (format stream "Error at offset ~A~%" (slot-value condition 'offset))
              (if (slot-value condition 'msg)
-                 (format stream msg)))))
+                 (format stream (slot-value condition 'msg))))))
 
 (define-condition unknown-op-error (repl-error)
   ((op :initarg :op :initform nil))
   (:report (lambda (condition stream)
-             (format stream "Unknown op error: ~A~%" (slot-value condition 'op)))))
+             (format stream "Unknown op error: ~A ~A~%" (slot-value condition 'op) (type-of (slot-value condition 'op))))))
 
 (define-condition undefined-variable-error (repl-error)
   ((variable :initarg :variable :initform nil)
@@ -104,10 +114,19 @@
   ((kind :initarg :kind :initform nil)
    (value :initarg :value :initform nil))
   (:report (lambda (condition stream)
-             (format stream "Invalid token at ~A: ~A ~A~%"
-                     (slot-value condition 'offset)
+             (format stream "Invalid ~A token at ~A: ~A~%"
                      (slot-value condition 'kind)
+                     (slot-value condition 'offset)
                      (slot-value condition 'value)))))
+
+(define-condition undefined-error (repl-error)
+  ((name :initarg :name :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "Undefined variable ~A~%"
+                     (slot-value condition 'name)))))
+
+(define-condition undefined-variable-error (undefined-error) ())
+(define-condition undefined-function-error (undefined-error) ())
 
 ;;;
 ;;; Compatibility layer functions
@@ -115,8 +134,9 @@
 
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
-(defvar *MEMORY* (make-array (* 8 1024)))
+(defvar *MEMORY* (make-array (* 8 1024) :element-type '(unsigned-byte 8)))
 (defvar *TOKEN-SEGMENT* 0)
+(defvar *CODE-SEGMENT* 0)
 ;;; Base of the read numbers
 (defvar *NUMBER-BASE* 10)
 
@@ -124,9 +144,10 @@
   (aref *MEMORY* ptr))
 
 (defun ptr-write-byte (c ptr)
-  (setf (aref *MEMORY* ptr) c))
+  (setf (aref *MEMORY* ptr) c)
+  (+ ptr 1))
 
-(defun ptr-read-array (ptr elements &optional (arr (make-array elements)))
+(defun ptr-read-array (ptr elements &optional (arr (make-array elements :element-type '(unsigned-byte 8))))
   (dotimes (n elements)
     (setf (aref arr n) (ptr-read-byte (+ ptr n))))
     arr)
@@ -189,13 +210,32 @@
 (defun ptr-write-float (value ptr)
   (ptr-write-long (sb-kernel:single-float-bits value) ptr))
 
-(defun ptr-find-string (str stack-start stack-end)
+(defun ptr-find-string= (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
         (if (> (length current) 0)
             (if (string= current str)
                 stack-start
-              (ptr-find-string str (+ 1 stack-start (length current)) stack-end))))))
+              (ptr-find-string= str (+ 1 stack-start (length current)) stack-end))))))
+
+(defun ptr-find-string-equal (str stack-start stack-end)
+  (if (< stack-start stack-end)
+      (let ((current (ptr-read-string stack-start)))
+        (if (> (length current) 0)
+            (if (string-equal current str)
+                stack-start
+              (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
+
+(defun ptr-zero (offset count)
+  (if (> count 4)
+      (progn
+        (ptr-write-long 0 offset)
+        (ptr-zero (+ offset *SIZEOF_LONG*) (- count *SIZEOF_LONG*)))
+    (if (> count 0)
+        (progn
+          (ptr-write-byte 0 offset)
+          (ptr-zero (+ offset 1) (- count 1)))
+      offset)))
 
 #-:sbcl
 (defun pointer-of (needle haystack)
@@ -219,12 +259,17 @@
         n
       (index-of needle haystack (+ 1 n)))))
 
-(defun symbol-id (symbol-offset)
-  (ptr-find-string (ptr-read-string symbol-offset) *TOKEN-SEGMENT* symbol-offset))
+(defun symbol-id (symbol-offset &optional (segment *TOKEN-SEGMENT*))
+  (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
 
 (defun symbol-string (symbol-offset)
   (if symbol-offset
       (ptr-read-string symbol-offset)))
+
+(defun symbol-intern (str start ending)
+  (let* ((off (ptr-write-string str ending))
+         (id (symbol-id off start)))
+    (if id id off)))
 
 #-:sbcl
 (defun string= (a b &optional (as 0) (bs 0))
@@ -272,13 +317,15 @@
 
 (defun special-form? (symbol-offset)
   (let ((sym (symbol-string symbol-offset)))
-    (or (string= sym "if")
-        (string= sym "let")
-        (string= sym "set")
-        (string= sym "quote")
-        (string= sym "values")
-        (string= sym "multiple-value-bind")
-        (string= sym "lambda"))))
+    (or (string-equal sym "if")
+        (string-equal sym "let")
+        (string-equal sym "set")
+        (string-equal sym "quote")
+        (string-equal sym "values")
+        (string-equal sym "multiple-value-bind")
+        (string-equal sym "lambda")
+        (string-equal sym "asm")
+        (string-equal sym "progn"))))
 
 ;; todo detect if the symbol was already read, return that offset and the original token-offset
 (defun read-symbol-inner (str output &optional starting)
@@ -365,15 +412,18 @@
 
 (defun make-op (op &optional a b c)
   (case op
-        ('load (make-short #x5 a b c))
-        ('store (make-short #xD a b c))
-        ('call (make-short #x7 #x7 b c))
-        ('ret (make-short #x7 #xc a b))
-        ('push (make-short #xE a b c))
-        ('pop (make-short #x6 a b c))
-        ('dec (make-short #X9 a b c))
-        (t (error 'unknown-op-error :op op)))
-  )
+   (:LOAD (make-short #x5 a b c))
+   (:STORE (make-short #xD a b c))
+   (:CALL (make-short #x7 #x7 a b))
+   (:RET (make-short #x7 #xc a b))
+   (:PUSH (make-short #xE a b c))
+   (:POP (make-short #x6 a b c))
+   (:INC (make-short #x1 a b c))
+   (:DEC (make-short #x9 a b c))
+   (:MOV (make-short #x8 a b c))
+   (:CMP (make-short #x2 0 a b))
+   (:RESET (make-short #x7 #x1 a b))
+   (t (error 'unknown-op-error :op op))))
 
 (defun emit-op (stack op &optional a b c)
   (format *standard-output* "~A ~A ~A ~A~%" op (or a 0) (or b 0) (or c 0))
@@ -395,8 +445,54 @@
 (defun emit-value (asm-stack kind value)
   (format *standard-output* ";; Value ~A ~A~%" kind value)
   (if (eq kind 'float)
-      (emit-float (emit-op asm-stack 'load 0 0 15) value)
-      (emit-integer (emit-op asm-stack 'load 0 0 15) value)))
+      (emit-float (emit-op asm-stack :load 0 0 15) value)
+      (emit-integer (emit-op asm-stack :load 0 0 15) value)))
+
+(defun env-push-binding (name env)
+  (ptr-write-long name env)
+  (+ *REGISTER-SIZE* env))
+
+(defun env-pop-bindings (env num)
+  (if (> num 0)
+      (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
+    env))
+
+(defun env-symbol-position (sym env-start env &optional (n 0))
+  (if (> env env-start)
+      (if (eq (ptr-read-long (- env *REGISTER-SIZE*)) sym)
+          n
+        (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
+    nil))
+
+(defun env-data-position (sym env-start env)
+  (let ((pos (env-symbol-position sym env-start env)))
+    (if pos
+        (- (/ (- env env-start) *REGISTER-SIZE*) pos 1))))
+
+(defun env-stack-position (sym env-start env)
+  (env-symbol-position sym env-start env))
+
+(defun env-define (name env-start env)
+  (let ((pos (env-symbol-position name env-start env)))
+    (if pos
+        env
+      (env-push-binding name env))))
+
+(defun emit-load-stack-value (asm-stack offset &optional (register 0))
+  (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
+  )
+
+(defun emit-store-stack-value (asm-stack offset &optional (register 0))
+  (emit-integer (emit-op asm-stack :store register 0 11) (* *REGISTER-SIZE* offset))
+  )
+
+(defun emit-load-data-value (asm-stack offset &optional (register 0))
+  (emit-integer (emit-op asm-stack :load register 0 9) (* *REGISTER-SIZE* offset))
+  )
+
+(defun emit-store-data-value (asm-stack offset &optional (register 0))
+  (emit-integer (emit-op asm-stack :store register 0 9) (* *REGISTER-SIZE* offset))
+  )
 
 (defun emit-lookup-call (asm-stack symbol env-start env)
   ;; load the symbol value into R1 and the toplevel lookup from the top of the stack
@@ -404,107 +500,196 @@
   (format *standard-output* ";;  globally~%")
   (emit-integer (emit-op (emit-integer (emit-op (emit-integer (emit-op asm-stack 'load 1 0 15)
                                                               symbol)
-                                                'load 0 0 11)
+                                                :load 0 0 11)
                                        (- env env-start))
-                         'call 0)
+                         :call 0 10)
                 0))
 
-(defun env-push-binding (name env)
-  (ptr-write-long name env)
-  (+ *SIZEOF_LONG* env))
-
-(defun env-pop-bindings (env num)
-  (if (> num 0)
-      (env-pop-bindings (- env *SIZEOF_LONG*) (- num 1))
-    env))
-
-(defun env-symbol-position (sym env-start env &optional (n 0))
-  (if (>= env env-start)
-      (if (eq (ptr-read-long env) sym)
-          (- n 1)
-        (env-symbol-position sym env-start (- env *SIZEOF_LONG*) (+ 1 n)))
-    nil))
-
-(defun emit-load-stack-value (asm-stack offset &optional (register 0))
-  (emit-integer (emit-op asm-stack 'load register 0 11) (* *REGISTER-SIZE* offset))
-  )
-
-(defun emit-store-stack-value (asm-stack offset &optional (register 0))
-  (emit-integer (emit-op asm-stack 'store register 0 11) (* *REGISTER-SIZE* offset))
-  )
-
-(defun emit-lookup (asm-stack symbol env-start env)
+(defun emit-lookup-global (asm-stack symbol env-start env)
   ;; search env for symbol
-  ;; if found, get its stack position and emit code to load its value
-  ;; otherwise try the global lookup function
-  (format *standard-output* ";; Lookup ~A ~A~%" (symbol-string symbol) env)
-  (let ((stack-pos (env-symbol-position symbol env-start env)))
+  ;; if found, get its position and emit code to load its value
+  (format *standard-output* ";; Lookup global ~A ~A~%" (symbol-string symbol) env)
+  (let ((stack-pos (env-data-position symbol env-start env)))
     (if stack-pos
-        (emit-load-stack-value asm-stack stack-pos)
-      (emit-lookup-call asm-stack symbol env-start env))))
+        (emit-load-data-value asm-stack stack-pos))))
+
+(defun emit-lookup-local (asm-stack symbol env-start env)
+  ;; search env for symbol
+  ;; if found, get its position and emit code to load its value
+  (format *standard-output* ";; Lookup local ~A ~A~%" (symbol-string symbol) env)
+  (let ((stack-pos (env-stack-position symbol env-start env)))
+    (if stack-pos
+        (emit-load-stack-value asm-stack stack-pos))))
+
+(defun emit-lookup (asm-stack symbol env-start env toplevel-start toplevel)
+  (let ((new-asm (emit-lookup-local asm-stack symbol env-start env)))
+    (if new-asm
+        new-asm
+      (let ((new-asm (emit-lookup-global asm-stack symbol toplevel-start toplevel)))
+        (if new-asm
+            new-asm
+          ;; todo call lookup for runtime use?
+          (error 'undefined-variable-error :name (symbol-string symbol)))))))
 
 ;; todo adjust stack offset in env with each push
-(defun compile-call-argument (str code-segment asm-stack token-offset env-start env arg)
+(defun compile-call-argument (str code-segment asm-stack token-offset env-start env toplevel-start toplevel arg)
   ;; until an #\) is read
   ;;   call each argument
   (format *standard-output* ";; Argument ~A~%" arg)
-  (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env token-kind token-value)
-                       (repl-compile-inner str code-segment asm-stack token-offset env-start env)
+  (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env toplevel token-kind token-value)
+                       (repl-compile-inner str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (if (and (eq token-kind 'special) (eq token-value (char-code #\))))
-                           (values offset code-segment new-asm-stack new-token-offset env arg)
+                           (values offset code-segment new-asm-stack new-token-offset env toplevel arg)
                          ;; push result onto stack and move to the next argument
-                         (compile-call-argument offset code-segment (emit-op new-asm-stack 'push 0) new-token-offset env-start (env-push-binding 0 new-env) (+ 1 arg))))
+                         (compile-call-argument offset code-segment (emit-op new-asm-stack :push 0) new-token-offset env-start (env-push-binding 0 new-env) toplevel-start toplevel (+ 1 arg))))
   )
 
-(defun emit-call (asm-stack args &optional (n args))
+(defun emit-funcall (asm-stack reg data-offset args &optional (n args))
   (if (<= n 0)
-      (emit-integer (emit-op (emit-op asm-stack 'pop 0) 'call 0 0) 0)
-    (emit-call (emit-op asm-stack 'pop n) args (- n 1))))
+      (emit-integer (emit-op asm-stack :call 0 reg) data-offset)
+    (emit-funcall (emit-op asm-stack :pop n) reg data-offset args (- n 1))))
 
-(defun compile-call-it (str code-segment asm-stack token-offset env-start env args)
-  (format *standard-output* ";; Call it: ~A args~%" args)
-  (values str code-segment (emit-call asm-stack args) token-offset (env-pop-bindings env args)))
+(defun compile-funcall-it (str code-segment asm-stack token-offset env-start env toplevel-start toplevel data-offset reg args)
+  (format *standard-output* ";; Call R~A+~A: ~A args~%" reg (* *REGISTER-SIZE* data-offset) args)
+  (values str code-segment (emit-funcall asm-stack reg (* *REGISTER-SIZE* data-offset) args) token-offset (env-pop-bindings env args) toplevel))
 
-(defun compile-funcall (str code-segment asm-stack token-offset env-start env)
-  (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env args)
+(defun compile-funcall-int (str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset)
+  (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env toplevel args)
                        ;; pop results into that argument's register
-                       (compile-call-argument str code-segment asm-stack token-offset env-start env 0)
+                       (compile-call-argument str code-segment asm-stack token-offset env-start env toplevel-start toplevel 0)
                        ;; make the call
-                       (compile-call-it offset code-segment new-asm-stack new-token-offset env-start new-env args)
-  ))
+                       (compile-funcall-it offset code-segment new-asm-stack new-token-offset env-start new-env toplevel-start toplevel data-offset reg args)
+                       ))
 
-(defun compile-if (offset code-segment asm-stack token-offset env-start env)
-  (error 'not-implemented-error :feature 'IF :offset offset)
-  (values offset code-segment asm-stack token-offset env))
+(defun compile-funcall (func-name str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  (let ((stack-pos (env-stack-position func-name env-start env))
+        (data-pos (env-data-position func-name toplevel-start toplevel)))
+    (if stack-pos
+        (compile-funcall-int str code-segment asm-stack token-offset env-start env toplevel-start toplevel 11 stack-pos)
+      (if data-pos
+          (compile-funcall-int str code-segment asm-stack token-offset env-start env toplevel-start toplevel 9 data-pos)
+        (error 'undefined-function :offset str :name (symbol-string func-name))))))
+
+;(emit-op (emit-lookup asm-stack value env-start env toplevel-start toplevel) :push 0)
+
+(defun compile-if-fixer (if-offset then-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  (let ((offset-to-else (+ (- then-offset if-offset) *SIZEOF_LONG*))
+        (offset-to-end (- asm-stack then-offset)))
+    (format *standard-output* ";; IF done ~A ~A ~A ~A ~A ~A~%" start-offset asm-stack if-offset then-offset offset-to-else offset-to-end)
+    ;; correct the jump from the CMP to go to ELSE
+    (ptr-write-long offset-to-else if-offset)
+    ;; correct the jump at the end of THEN past the ELSE
+    (ptr-write-long offset-to-end then-offset)
+    (values start-offset code-segment asm-stack token-offset env toplevel)))
+
+(defun compile-if-closing (if-offset then-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  (format *standard-output* ";; IF closing ~A~%" start-offset)
+  ;; read the closing #\)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (if (and (eq kind 'special) (eq value (char-code #\))))
+                           (compile-if-fixer if-offset then-offset offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                         (error 'invalid-token-error :offset start-offset :kind kind :value value))))
+
+(defun compile-if-else (if-offset then-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; compile the ELSE form
+  (format *standard-output* ";; IF else~%")
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                       ;; no form, then done
+                       (if (and (eq kind 'special) (eq value (char-code #\))))
+                           (compile-if-fixer if-offset nil offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                         ;; almost done
+                         (if kind
+                             (error 'invalid-token-error :offset start-offset :kind kind :value value)
+                           (compile-if-closing if-offset then-offset offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
+                           ))
+;;;(error 'invalid-token-error :offset start-offset :kind kind :value value)
+
+(defun compile-if-then (if-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; compile the THEN form
+  (format *standard-output* ";; IF then~%")
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                       ;; no form, then done
+                       (if (and (eq kind 'special) (eq kind (char-code #\))))
+                           (compile-if-fixer if-offset nil offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                         ;; form so try ELSE
+                         (if kind
+                             (error 'invalid-token-error :offset start-offset :kind kind :value value)
+                           (compile-if-else if-offset
+                                          (+ *SIZEOF_SHORT* asm-stack)
+                                          offset
+                                          code-segment
+                                          (emit-integer (emit-op asm-stack :inc 12) #xFFFFFFFF)
+                                          token-offset
+                                          env-start
+                                          env
+                                          toplevel-start
+                                          toplevel)))))
+
+(defun compile-if (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; compile the test
+  (format *standard-output* ";; IF condition~%")
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                       (if kind (error 'invalid-token-error :offset start-offset :kind kind :value value))
+                       (compile-if-then (+ (* 2 *SIZEOF_LONG*) *SIZEOF_SHORT* asm-stack)
+                                        offset
+                                        code-segment
+                                        (emit-integer (emit-op (emit-op (emit-integer (emit-op asm-stack :load 1 0 15) 0) :cmp 0 1) :inc 12 #x1) #xFFFFFFFF)
+                                        token-offset env-start env toplevel-start toplevel)))
 
 (defun emit-poppers (asm-stack num-bindings)
   (format *standard-output* ";; ~A poppers~%" num-bindings)
-  (emit-integer (emit-op asm-stack 'dec 11) (* num-bindings *REGISTER-SIZE*)))
+  (emit-integer (emit-op asm-stack :dec 11) (* num-bindings *REGISTER-SIZE*)))
 
-(defun compile-progn (offset code-segment asm-stack token-offset env-start env &optional (n 0))
+(defun compile-progn (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional (n 0))
   (format *standard-output* ";; expr ~A~%" n)
-  (multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-                       (repl-compile-inner offset code-segment asm-stack token-offset env-start env)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (if (and (eq kind 'special) (eq value (char-code #\))))
-                           (values offset code-segment asm-stack token-offset env)
-                         (compile-progn offset code-segment asm-stack token-offset env-start env (+ 1 n)))))
+                           (values offset code-segment asm-stack token-offset env toplevel)
+                         (compile-progn offset code-segment asm-stack token-offset env-start env toplevel-start toplevel (+ 1 n)))))
+
+(defun compile-toplevel (start-offset o-code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel &optional (n 0) starting-asm-stack)
+  (format *standard-output* ";; toplevel ~A~%" n)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner start-offset o-code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
+                       (if (and (eq kind 'eos))
+                           ;; copy code to code-segment from asm-stack
+                           (let* ((asm-stack (emit-op asm-stack :ret))
+                                  (code-segment (ptr-copy starting-asm-stack code-segment (- asm-stack starting-asm-stack))))
+                             (format *standard-output* ";;    code segment ~A ~A ~A ~A~%" o-code-segment code-segment *code-segment* (- o-code-segment *code-segment*))
+                             (values offset
+                                     
+                                     code-segment
+                                     ;; emit the address for toplevel's initializer
+                                     (emit-value starting-asm-stack 'integer (- o-code-segment *code-segment*))
+                                     token-offset
+                                     env
+                                     toplevel))
+                         (if (eq kind nil)
+                             (compile-toplevel offset code-segment asm-stack token-offset env-start env toplevel-start toplevel (+ 1 n) (or starting-asm-stack orig-asm-stack))
+                           (error 'invalid-token-error :offset start-offset :kind kind :value value)))))
 
 ;;; LET
-(defun compile-let-body (num-bindings offset code-segment asm-stack token-offset env-start env &optional (n 0))
-  (multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-                       (compile-progn offset code-segment asm-stack token-offset env-start env)
+(defun compile-let-body (num-bindings offset code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional (n 0))
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (compile-progn offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (format *standard-output* ";; let body closing~%")
                        (values offset
                                code-segment
                                (emit-poppers asm-stack num-bindings)
                                token-offset
-                               (env-pop-bindings env num-bindings))
+                               (env-pop-bindings env num-bindings)
+                               toplevel)
                        ))
 
-(defun compile-let-binding-initializer (num name start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-let-binding-initializer (num name start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (format *standard-output* ";;  ~A: ~A init~%" num (symbol-string name))
-  (multiple-value-bind (offset code-segment asm-stack token-offset env)
-                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
+                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (multiple-value-bind (kind value offset token-offset)
                                             (read-token offset token-offset)
                                             (unless (and (eq kind 'special) (eq value (char-code #\))))
@@ -513,39 +698,40 @@
                                              offset
                                              code-segment
                                              ;; push to stack
-                                             (emit-call asm-stack 'push 0)
+                                             (emit-op asm-stack :push 0)
                                              token-offset
                                              ;; add to env
-                                             (env-push-binding name env)))))
+                                             (env-push-binding name env)
+                                             toplevel))))
 
-(defun compile-let-binding (num start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-let-binding (num start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; read the name
   (multiple-value-bind (kind name offset token-offset)
                        (read-token start-offset token-offset)
                        (unless (eq kind 'symbol)
                          (error 'malformed-let-error :offset start-offset))
                        ;; compile the initializer
-                       (compile-let-binding-initializer num name offset code-segment asm-stack token-offset env-start env)))
+                       (compile-let-binding-initializer num name offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
 
-(defun compile-let-bindings (num start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-let-bindings (num start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        (cond
                         ;; read #\(
                         ((and (eq kind 'special) (eq value (char-code #\()))
-                         (multiple-value-bind (offset code-segment asm-stack token-offset env)
-                                              (compile-let-binding num offset code-segment asm-stack token-offset env-start env)
-                                              (compile-let-bindings (+ 1 num) offset code-segment asm-stack token-offset env-start env))
+                         (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
+                                              (compile-let-binding num offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                                              (compile-let-bindings (+ 1 num) offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
                          )
                         ((and (eq kind 'special) (eq value (char-code #\))))
                          (format *standard-output* ";; Let body, ~A bindings~%" num)
-                         (compile-let-body num offset code-segment asm-stack token-offset env-start env)
+                         (compile-let-body num offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                          )
                         (t (error 'malformed-let-error :offset start-offset)))
                        )
   )
 
-(defun compile-let (start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-let (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; todo
   ;; for each binding, compile and push the value, then push the name's symbol value to env
   ;; compile the body
@@ -554,112 +740,123 @@
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        (if (and (eq kind 'special) (eq value (char-code #\()))
-                           (compile-let-bindings 0 offset code-segment asm-stack token-offset env-start env)
+                           (compile-let-bindings 0 offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                          (error 'malformed-let-error :offset start-offset))))
 
 ;; Lambda
-(defun compile-lambda-optional-bindings (num start-offset code-segment asm-stack token-offset env-start env func-name)
+(defun compile-lambda-optional-bindings (num start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
   ;; read token, determine symbol or list, and push symbols or list's head into env, compile list's tail and conditionally run before the body
   (error 'not-implemented-error)
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        ))
 
-(defun compile-lambda-rest-binding (num start-offset code-segment asm-stack token-offset env-start env func-name)
+(defun compile-lambda-rest-binding (num start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
   ;; read symbol and push into env, then move to the body
   (error 'not-implemented-error)
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        ))
 
-(defun compile-lambda-body (num-bindings start-offset code-segment asm-stack token-offset env-start env func-name)
-  (multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-                       (compile-progn start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-lambda-body (num-bindings start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (compile-progn start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (format *standard-output* ";; lambda closing ~A~%" (symbol-string func-name))
                        (if func-name (setq num-bindings (+ 1 num-bindings)))
                        (values offset
                                code-segment
                                (emit-op (emit-poppers asm-stack num-bindings)
-                                        'ret)
+                                        :ret)
                                token-offset
-                               (env-pop-bindings env num-bindings))
+                               (env-pop-bindings env num-bindings)
+                               toplevel)
                        )
   )
 
-(defun compile-lambda-bindings (num start-offset code-segment asm-stack token-offset env-start env func-name)
+(defun compile-lambda-bindings (num start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
   ;; read symbols and push into env until &optional or &rest or )
   ;; todo shift env-start?
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        (cond
-                        ((and (eq kind 'symbol) (string= (symbol-string value) "&optional"))
-                         (compile-lambda-optional-bindings num offset code-segment asm-stack token-offset env-start env func-name))
-                        ((and (eq kind 'symbol) (string= (symbol-string value) "&rest"))
-                         (compile-lambda-rest-binding num offset code-segment asm-stack token-offset env-start env func-name))
+                        ((and (eq kind 'symbol) (string-equal (symbol-string value) "&optional"))
+                         (compile-lambda-optional-bindings num offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+                        ((and (eq kind 'symbol) (string-equal (symbol-string value) "&rest"))
+                         (compile-lambda-rest-binding num offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
                         ((eq kind 'symbol)
                          (format *standard-output* ";;   ~A: ~A~%" num (symbol-string value))
-                         (compile-lambda-bindings (+ 1 num) offset code-segment (emit-op asm-stack 'push (+ 1 num)) token-offset env-start (env-push-binding value env) func-name))
+                         (compile-lambda-bindings (+ 1 num) offset code-segment (emit-op asm-stack :push (+ 1 num)) token-offset env-start (env-push-binding value env) toplevel-start toplevel func-name))
                         ((and (eq kind 'special) (eq value (char-code #\))))
-                         (compile-lambda-body num offset code-segment asm-stack token-offset env-start env func-name))
+                         (compile-lambda-body num offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
                         (t (error 'malformed-lambda-error :offset start-offset))))
   )
 
-(defun compile-lambda (start-offset code-segment orig-asm-stack token-offset env-start env &optional name)
+(defun compile-lambda (start-offset code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel &optional name)
   (multiple-value-bind (kind value offset token-offset)
                        (read-token start-offset token-offset)
                        (cond
+                        ;; named lambda, extract the name and push to the stack
                         ((and (eq name nil) (eq kind 'symbol))
-                         (compile-lambda offset code-segment (emit-op orig-asm-stack 'push 12) token-offset env-start (env-push-binding value env) value))
+                         (compile-lambda offset code-segment (emit-op orig-asm-stack :push 12) token-offset env-start env toplevel-start toplevel value))
+                        ;; start of the arglist
                         ((and (eq kind 'special) (eq value (char-code #\()))
                          (format *standard-output* ";; Lambda ~A~%" (symbol-string name))
-                         (multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-                                              (compile-lambda-bindings 0 offset code-segment orig-asm-stack token-offset env env name)
+                         (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                                              (compile-lambda-bindings 0 offset code-segment orig-asm-stack token-offset env (if name (env-push-binding name env) env) toplevel-start toplevel name)
                                               (format *standard-output* ";; Copied to code-segment ~A~%" code-segment)
                                               (values offset
                                                       ;; copy code from asm-stack to code-segment
                                                       (ptr-copy orig-asm-stack code-segment (- asm-stack orig-asm-stack))
                                                       ;; emit the start in the code-segment on the asm-stack at the original asm-stack
-                                                      (emit-value orig-asm-stack 'integer code-segment)
+                                                      ;; todo substract the CS from the value
+                                                      (emit-value orig-asm-stack 'integer (- code-segment *code-segment*))
                                                       token-offset
                                                       env-start
-                                                      env)))
+                                                      toplevel)))
                         (t (error 'malformed-lambda-error :offset start-offset)))))
 
 ;; SET
-(defun compile-set-local (name stack-pos start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-set-local (name stack-pos start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; if local, compile and store the value
   (format *standard-output* ";; setting local ~A at SP+~A~%" (symbol-string name) (* *SIZEOF_LONG* stack-pos))
-  (multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (if kind (error 'malformed-error :offset start-offset :msg kind))
                        ;; eat the terminating )
                        (multiple-value-bind (kind value offset token-offset)
                                             (read-token offset token-offset)
                                             (if (and (eq kind 'special) (eq value (char-code #\))))
-                                                (values offset code-segment (emit-store-stack-value asm-stack stack-pos 0) token-offset env)
+                                                (values offset code-segment (emit-store-stack-value asm-stack stack-pos 0) token-offset env toplevel)
                                               (error 'malformed-error :offset start-offset :msg "Terminator")))
   ))
 
-(defun compile-set-global (name offset code-segment asm-stack token-offset env-start env)
+(defun compile-set-global (name start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; if global, compile, and add or set the value
-  (format *standard-output* ";; setting global ~A~%" (symbol-string name))
-  ;(multiple-value-bind (offset code-segment asm-stack token-offset env kind value)
-  ;                     (repl-compile-inner offset code-segment asm-stack token-offset env-start env)
-  (error 'not-implemented-error :feature 'set :offset offset)
-  ;(values offset code-segment asm-stack token-offset env)
-  )
+  (let ((toplevel (env-define name toplevel-start toplevel)))
+    (format *standard-output* ";; setting global ~A ~A ~A ~A~%" (symbol-string name) name toplevel (env-data-position name toplevel-start toplevel))
+    (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                         (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                         (if kind (error 'malformed-error :offset start-offset :msg kind))
+                         ;; eat the terminating )
+                         (multiple-value-bind (kind value offset token-offset)
+                                              (read-token offset token-offset)
+                                              (if (and (eq kind 'special) (eq value (char-code #\))))
+                                                  (let ((data-pos (env-data-position name toplevel-start toplevel)))
+                                                    (values offset code-segment (emit-store-data-value asm-stack data-pos 0) token-offset env toplevel))
+                                                (error 'malformed-error :offset start-offset :msg "Terminator")))
+                         )))
 
-(defun compile-set (offset code-segment asm-stack token-offset env-start env)
+(defun compile-set (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; read symbol
   (multiple-value-bind (kind value offset token-offset)
                        (read-token offset token-offset)
                        ;; determine if variable is on the stack or a global
-                       (let ((stack-pos (env-symbol-position value env-start env)))
+                       (let ((stack-pos (env-stack-position value env-start env)))
                          (if stack-pos
-                             (compile-set-local value stack-pos offset code-segment asm-stack token-offset env-start env)
-                           (compile-set-global value offset code-segment asm-stack token-offset env-start env)))))
+                             (compile-set-local value stack-pos offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                           (compile-set-global value offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)))))
 
-(defun compile-quote (start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-quote (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind quoted-value offset token-offset)
                        (read-token start-offset token-offset)
                        (if (eq kind 'symbol)
@@ -667,76 +864,184 @@
                                                 (read-token offset token-offset)
                                                 (format *standard-output* ";; Quote: ~A~%" (symbol-string quoted-value))
                                                 (if (and (eq kind 'special) (eq value (char-code #\))))
-                                                    (values offset code-segment (emit-value asm-stack 'integer quoted-value) token-offset env)
+                                                    (values offset code-segment (emit-value asm-stack 'integer quoted-value) token-offset env toplevel)
                                                   (error 'malformed-error :offset start-offset)))
-                         (error 'not-yet-implemented-error :feature 'quote :offset start-offset))))
+                         (error 'not-implemented-error :feature 'quote :offset start-offset))))
 
-(defun compile-shortcut-quote (start-offset code-segment asm-stack token-offset env-start env)
+(defun compile-shortcut-quote (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind quoted-value offset token-offset)
                        (read-token start-offset token-offset)
                        (if (eq kind 'symbol)
                            (progn
                              (format *standard-output* ";; Quote: ~A~%" (symbol-string quoted-value))
-                             (values offset code-segment (emit-value asm-stack 'integer quoted-value) token-offset env))
+                             (values offset code-segment (emit-value asm-stack 'integer quoted-value) token-offset env toplevel))
                          (error 'malformed-error :offset start-offset))))
 
 
-(defun compile-values (offset code-segment asm-stack token-offset env-start env)
+(defun compile-asm-op (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional op a b c)
+  ;; each op has up to 4 values: op-name a b c
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'special) (eq value (char-code #\))))
+                                        ;(values offset code-segment (emit-op asm-stack (intern (string-upcase (symbol-string op))) a b c) token-offset env toplevel))
+                         (compile-asm offset code-segment
+                                      (emit-op asm-stack (intern (string-upcase (symbol-string op)) "KEYWORD") a b c)
+                                      token-offset env-start env toplevel-start toplevel))
+                        ((and (eq kind 'symbol) (eq op nil))
+                         (compile-asm-op offset code-segment asm-stack token-offset env-start env toplevel-start toplevel value nil nil nil))
+                        ((eq kind 'integer)
+                         (cond
+                          (a (compile-asm-op offset code-segment asm-stack token-offset env-start env toplevel-start toplevel op a value nil))
+                          (b (compile-asm-op offset code-segment asm-stack token-offset env-start env toplevel-start toplevel op a b value))
+                          (c (error 'malformed-error :offset start-offset))
+                          (t (compile-asm-op offset code-segment asm-stack token-offset env-start env toplevel-start toplevel op value nil nil))
+                          ))
+                        (t (error 'malformed-error :offset start-offset)))
+  ))
+
+(defun compile-asm (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; each element is an op list or a value
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (compile-asm-op offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+                        ((and (eq kind 'special) (eq value (char-code #\))))
+                         (values offset code-segment asm-stack token-offset env toplevel))
+                        ((eq kind 'integer)
+                         (compile-asm offset code-segment (emit-integer asm-stack value) token-offset env-start env toplevel-start toplevel))
+                        ((eq kind 'float)
+                         (compile-asm offset code-segment (emit-float asm-stack value) token-offset env-start env toplevel-start toplevel))
+                        ((eq kind 'symbol)
+                         (compile-asm offset code-segment (emit-lookup asm-stack value env-start env toplevel-start toplevel) token-offset env-start env toplevel-start toplevel))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-values (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; can be a runtime function w/o call, preamble, and postamble; but does return from the caller: defop?
   (error 'not-implemented-error :feature 'values :offset offset)
-  (values offset code-segment asm-stack token-offset env))
+  (values offset code-segment asm-stack token-offset env toplevel))
 
-(defun compile-mvb (offset code-segment asm-stack token-offset env-start env)
+(defun compile-mvb (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (error 'not-implemented-error :feature 'multi-value-bind :offset offset)
-  (values offset code-segment asm-stack token-offset env))
+  (values offset code-segment asm-stack token-offset env toplevel))
 
-(defun compile-special-form (form offset code-segment asm-stack token-offset env-start env)
+(defun compile-special-form (form offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (let ((form-str (symbol-string form)))
     (cond
-     ((string= form-str "if") (compile-if offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "let") (compile-let offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "set") (compile-set offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "quote") (compile-quote offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "values") (compile-values offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "multiple-value-bind") (compile-mvb offset code-segment asm-stack token-offset env-start env))
-     ((string= form-str "lambda") (compile-lambda offset code-segment asm-stack token-offset env-start env))
+     ((string-equal form-str "if") (compile-if offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "let") (compile-let offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "set") (compile-set offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "quote") (compile-quote offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "values") (compile-values offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "multiple-value-bind") (compile-mvb offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "lambda") (compile-lambda offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "asm") (compile-asm offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "progn") (compile-progn offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
      (t (error 'unknown-special-form-error :offset offset :form form-str)))))
 
-(defun compile-call (str code-segment asm-stack token-offset env-start env)
+(defun compile-call (str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind value offset token-offset)
                        (read-token str token-offset)
-                       (format *standard-output* ";; Calling ~A ~A~%" kind (if (eq kind 'symbol) (symbol-string value) value))
+                       (format *standard-output* ";; Calling ~A ~A ~A~%" kind (if (eq kind 'symbol) (symbol-string value) value) (special-form? value))
                        (cond
                         ;; special forms
                         ((and (eq kind 'symbol) (special-form? value))
-                         (compile-special-form value offset code-segment asm-stack token-offset env-start env))
+                         (compile-special-form value offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
                         ;; function calls
-                        ((or (eq kind 'symbol))
-                         (compile-funcall offset code-segment (emit-op (emit-lookup asm-stack value env-start env) 'push 0) token-offset env-start env))
+                        ((eq kind 'symbol)
+                         (compile-funcall value offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
                         ;; or call function by address
                         ((or (eq kind 'integer))
-                         (compile-funcall offset code-segment (emit-op (emit-value asm-stack 'integer value) 'push 0) token-offset env-start env))
+                         (compile-funcall-int offset code-segment (emit-op (emit-value asm-stack 'integer value) :push 0) token-offset env-start env toplevel-start toplevel 9 value))
                         (t (error 'compile-call-error))))
   )
 
-(defun repl-compile-inner (str code-segment asm-stack token-offset env-start env)
+(defun repl-compile-inner (str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind value offset new-token-offset)
                        (read-token str token-offset)
                        (cond
-                        ((eq kind 'integer) (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env))
-                        ((eq kind 'float) (values offset code-segment (emit-value asm-stack 'float value) new-token-offset env))
-                        ((eq kind 'symbol) (values offset code-segment (emit-lookup asm-stack value env-start env) new-token-offset env))
-                        ((and (eq kind 'special) (eq value (char-code #\())) (compile-call offset code-segment asm-stack new-token-offset env-start env))
-                        ((and (eq kind 'special) (eq value (char-code #\'))) (compile-shortcut-quote offset code-segment asm-stack new-token-offset env-start env))
-                        ((eq kind 'special) (values offset code-segment asm-stack new-token-offset env kind value))
+                        ((eq kind 'integer) (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env toplevel))
+                        ((eq kind 'float) (values offset code-segment (emit-value asm-stack 'float value) new-token-offset env toplevel))
+                        ((eq kind 'symbol) (values offset code-segment (emit-lookup asm-stack value env-start env toplevel-start toplevel) new-token-offset env toplevel))
+                        ((and (eq kind 'special) (eq value (char-code #\())) (compile-call offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
+                        ((and (eq kind 'special) (eq value (char-code #\'))) (compile-shortcut-quote offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
+                        ((or (eq kind 'special) (eq kind 'eos)) (values offset code-segment asm-stack new-token-offset env toplevel kind value))
                         (t (error 'invalid-token-error :offset str :kind kind :value value))
                         ))
   )
 
-(defun repl-compile (str code-segment asm-stack token-offset env-start env)
+(defun repl-compile (str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (setf *TOKEN-SEGMENT* token-offset)
-  (repl-compile-inner str code-segment asm-stack token-offset env-start env)
+  (setf *CODE-SEGMENT* code-segment)
+  (compile-toplevel str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   )
+
+(defvar *INIT-FUNC* "__init")
+
+(defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
+  (emit-op (emit-integer
+            (emit-op
+             (emit-store-data-value (emit-integer (emit-op
+                                                   (emit-integer (emit-op asm-stack :load 10 0 15)
+                                                                 code-segment)
+                                                   :load 9 0 15)
+                                                  data-segment)
+                                    (env-data-position init toplevel-start toplevel))
+                 :call 0 10)
+                         0)
+           :reset))
+
+(defvar *ISR-MAX* 128)
+(defvar *ISR-BYTE-SIZE* (* *REGISTER-SIZE* 2))
+(defvar *ISR-TOTAL-SIZE* (* *ISR-BYTE-SIZE* *ISR-MAX*))
+
+(defun write-to-array (output cs-start code-segment asm-start asm-stack token-start token-offset env-start env toplevel-start toplevel)
+  ;; create reset ISR that init's CS, DS, calls init, and toplevel's init in asm-stack
+  ;; todo CS & DS can be anywhere, offset in file is good
+  (format *standard-output* "write-to-array ~A ~A~%" (ptr-read-array asm-start (- asm-stack asm-start)) (- token-offset token-start))
+  (let* ((toplevel (env-define (symbol-intern *INIT-FUNC* token-start token-offset) toplevel-start toplevel))
+         (asm-stack-end (emit-init asm-stack *ISR-TOTAL-SIZE* 2048 toplevel-start toplevel (symbol-intern *INIT-FUNC* token-start token-offset)))
+         (code-segment-end (ptr-copy asm-start code-segment (- asm-stack-end asm-start)))
+         (isr-end (emit-integer (emit-op asm-stack :load 12 0 15) (+ *ISR-TOTAL-SIZE* (- code-segment cs-start))))
+         )
+    ;; zero ISR
+    (ptr-zero output *ISR-TOTAL-SIZE*)
+    ;; place jump at byte 0
+    (ptr-copy asm-stack output (- isr-end asm-stack))
+    ;; code segment
+    (ptr-copy cs-start (+ output *ISR-TOTAL-SIZE*) (- code-segment-end cs-start))
+    ;; strings
+    (ptr-copy token-start (+ output *ISR-TOTAL-SIZE* (- code-segment-end cs-start)) (- token-offset token-start))
+    ;; toplevel symbol table
+    (ptr-copy toplevel-start (+ output *ISR-TOTAL-SIZE* (- code-segment-end cs-start) (- token-offset token-start)) (- toplevel toplevel-start))
+    ;; write indexes: code-segment strings toplevel
+    (ptr-write-long (+ output *ISR-TOTAL-SIZE*
+                       (- code-segment-end cs-start)
+                       (- token-offset token-start))
+                    (ptr-write-long (+ output *ISR-TOTAL-SIZE*
+                                       (- code-segment-end cs-start))
+                                    (ptr-write-long (+ output *ISR-TOTAL-SIZE*)
+                                                    (+ output *ISR-TOTAL-SIZE*
+                                                       (- code-segment-end cs-start)
+                                                       (- token-offset token-start)
+                                                       (- toplevel toplevel-start)))))))
+
+(defun write-to-file (path output cs-start code-segment asm-start asm-stack token-start token-offset env-start env toplevel-start toplevel)
+  (with-open-file (f path
+                     :direction :output
+                     :if-exists :supersede
+                     :external-format :default
+                     :element-type '(unsigned-byte 8))
+                  (let* ((output-end (write-to-array output cs-start code-segment asm-start asm-stack token-start token-offset env-start env toplevel-start toplevel))
+                         (size (- output-end output)))
+                    (format *standard-output* "Size ~A~%" size)
+                    (write-sequence (ptr-read-array output size) f))))
+
+(defun compile-to-file (path output o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
+                       (repl-compile o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
+                       (write-to-file path output o-code-segment code-segment o-asm-stack asm-stack o-token-offset token-offset env-start env o-toplevel toplevel)))
 
 ;;;
 ;;; Test functions
@@ -797,7 +1102,7 @@
     (if (> len 0)
         (progn
           (format *standard-output* "~A  ~A~%" start str)
-          len))))
+          (+ 1 len)))))
 
 (defun print-strings (start size)
   (if (> size 0)
@@ -805,10 +1110,10 @@
         (if len
             (print-strings (+ start len) (- size len))))))
 
-(defun debug-compile (o-offset o-code-segment o-asm-stack o-token-offset env-start o-env)
-  (multiple-value-bind (offset code-segment asm-stack token-offset env)
-                       (repl-compile o-offset o-code-segment o-asm-stack o-token-offset env-start o-env)
-                       (format *standard-output* "~A ~A ~A ~A ~A~%" offset code-segment asm-stack token-offset env)
+(defun debug-compile (o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
+                       (repl-compile o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
+                       (format *standard-output* "~A ~A ~A ~A ~A ~A~%" offset code-segment asm-stack token-offset env toplevel)
                        (print 'Input)
                        (print-string o-offset)
                        (print (ptr-read-array o-offset (- offset o-offset)))
@@ -820,23 +1125,26 @@
                        (print-strings o-token-offset (- token-offset o-token-offset))
                        (print (ptr-read-array o-token-offset (- token-offset o-token-offset)))
                        (print 'Env)
-                       (print (ptr-read-array env-start (- env env-start)))))
+                       (print (ptr-read-array env-start (- env env-start)))
+                       (print 'Toplevel)
+                       (print (ptr-read-array o-toplevel (- toplevel o-toplevel)))))
 
 (defun test-compile ()
   (ptr-write-string "(print 'value (+ x 1 2 (* 3 4 (square x)) 5))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-quote ()
   (ptr-write-string "(quote value)" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-let ()
-  (ptr-write-string "(let ((x (+ 1 2))
+  (ptr-write-string "(let ((+ 0) (* 0) (square 0) (print 0)
+                           (x (+ 1 2))
                            (y (* 3 4 (square x))))
                        (print x)
                        (print y)
                        (print (+ x y)))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-set-local ()
   (ptr-write-string "(let ((x 0)
@@ -847,14 +1155,14 @@
                        (let ((z 1))
                          (set z 2)
                          (set x 456)))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-lambda ()
   (ptr-write-string "(lambda (x y)
                        (print x y)
                        (set x (+ 1 123))
                        (set y 456))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-named-lambda ()
   (ptr-write-string "(lambda f (x y)
@@ -862,13 +1170,39 @@
                        (set x (+ 1 123))
                        (set y 456)
                        (f (+ 1 x) y))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-compile-set-lambda ()
   (ptr-write-string "(set f (lambda (n)
-                       (print n)
-                       (f (- 1 n))))" 0)
-  (debug-compile 0 1000 2000 3000 4000 4004))
+                       n
+                       (f n)))
+                     (set g (lambda () (f 10)))
+                     (g (f 123))" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-compile-set-global ()
+  (ptr-write-string "(set x 123)" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-compile-if-2 ()
+  (ptr-write-string "(let ((x 1) (t 1) (nil 0)) (if x t nil))" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-compile-if ()
+  (ptr-write-string "(if 0 1 (progn 1 2 3))" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-compile-asm ()
+  (ptr-write-string "(asm (push 0))
+                     (asm (load 2) 1234 (push 2) (mov 2 0))" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-write-to-array ()
+  (write-to-array 6000 1000 1050 2000 2006 3000 3009 4000 4004 5000 5004))
+
+(defun test-write (&optional (path "test.out"))
+  (ptr-write-string "(set f (lambda (x) (if x 'then 'else))) (f 0) (f 1)" 0)
+  (compile-to-file path 6000 0 1000 2000 3000 4000 4004 5000))
 
 (defun test ()
   (test-read-token))
