@@ -60,6 +60,8 @@
            :repl-compile
            :write-to-array
            :write-to-file
+           :compile-to-file
+           :repl-file
            ))
 
 (in-package :repl)
@@ -1136,6 +1138,15 @@
   (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
                        (repl-compile o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
                        (write-to-file path output o-code-segment code-segment o-asm-stack asm-stack o-token-offset token-offset env-start env o-toplevel toplevel)))
+
+(defun repl-file (path)
+  (with-open-file (f path
+                     :direction :input
+                     :external-format :default
+                     :element-type '(unsigned-byte 8))
+                  (ptr-write-byte 0 (+ 1 (read-sequence *memory* f))))
+  (compile-to-file (concatenate 'string path ".bin")
+                   6000 0 1000 2000 3000 4000 4004 5000))
 
 ;;;
 ;;; Test functions
