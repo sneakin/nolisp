@@ -4,6 +4,8 @@
            :unknown-op-error
            :malformed-error
            :malformed-let-error
+           :has-feature?
+           :*repl-features*
            :env-define
            :env-symbol-position
            :env-stack-position
@@ -48,6 +50,7 @@
            :test-compile-if
            :test-compile-asm
            :test-compile-values
+           :test-compile-conditional
            :test-write-to-array
            :test-write
            :string=
@@ -58,6 +61,7 @@
            :emit-lookup-call
            :emit-value
            :repl-compile
+           :repl-eval
            :write-to-array
            :write-to-file
            :compile-to-file
@@ -150,6 +154,20 @@
 ;;; Compatibility layer functions
 ;;;
 
+;;; Info functions
+
+(defvar *repl-features* (list :repl :x86 :cross))
+
+(defun has-feature? (feature &optional (features *repl-features*))
+  (if (stringp feature)
+      (setq feature (intern (string-upcase (if (eq (aref feature 0) #\:)
+                                               (subseq feature 1)
+                                             feature))
+                            "KEYWORD")))
+  (not (eq nil (position feature features))))
+
+;;; Memory
+
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
 (defvar *MEMORY* (make-array (* 8 1024) :element-type '(unsigned-byte 8)))
@@ -211,13 +229,13 @@
   (eq c 0))
 
 #+:sbcl
-(defun ptr-read-string (ptr &optional acc)
+(defun ptr-read-string (ptr &optional count acc (n 0))
   (let* ((c (ptr-read-byte ptr)))
-    (if (null? c)
+    (if (or (and count (>= n count)) (null? c))
         acc
       (progn
         (setf acc (concatenate 'string acc (list (code-char c))))
-        (ptr-read-string (+ 1 ptr) acc)))))
+        (ptr-read-string (+ 1 ptr) count acc (+ 1 n))))))
 
 #+:sbcl
 (defun ptr-read-float (ptr)
@@ -455,18 +473,22 @@
   (error 'not-implemented-error))
 
 (defun read-character-symbol (str token-offset)
-  (multiple-value-bind (kind value offset token-offset)
-                       (read-symbol str token-offset)
+  (multiple-value-bind (kind value offset new-token-offset)
+                       (read-token str token-offset)
                        (if (not (eq kind 'symbol)) (error 'invalid-token-error :offset str :kind kind :value value))
                        (let ((c (character-by-name (symbol-string value))))
                          (if c
                              (values 'character (char-code c) offset token-offset)
                            (error 'invalid-token-error :offset str :kind kind :value value)))))
 
-(defun read-character (str token-offset)
+(defun read-character (str token-offset &optional char)
   (let ((c (ptr-read-byte str)))
+    (format *standard-output* "char ~A ~A ~%" c char)
     (cond
-     ((not (space? c)) (read-character-symbol str token-offset))
+     (char (if (and (symbol-char? char) (symbol-char? c))
+               (read-character-symbol (- str 1) token-offset)
+             (values 'character char str token-offset)))
+     ((not char) (read-character (+ 1 str) token-offset c))
      (t (error 'invalid-token-error :offset str :value c)))))
 
 (defun read-reader-macro (str token-offset)
@@ -477,8 +499,9 @@
      ;; #xHEX
      ((or (eq c (char-code #\x)) (eq c (char-code #\X))) (read-number (+ 1 str) 0 16 token-offset))
      ;; #+expr
+     ((eq c (char-code #\+)) (values 'condition t str token-offset))
      ;; #-expr
-     ((or (eq c (char-code #\+)) (eq c (char-code #\-))) (read-symbol (- str 1) token-offset))
+     ((eq c (char-code #\-)) (values 'condition nil str token-offset))
      ;; anything else
      ;; todo lookup in table
      (t (error 'invalid-token-error :offset str))
@@ -1164,16 +1187,114 @@
                         (t (error 'compile-call-error))))
   )
 
+(defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token offset token-offset)
+                       (format *standard-output* "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
+                       (cond
+                        ((and (eq kind 'special) (eq value initiator))
+                         (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
+                        ((and (eq kind 'special) (eq value terminator))
+                         (if (<= depth 1)
+                             (progn (format *standard-output* "  done~%")
+                                    offset) ; done
+                           (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up
+                        (t (scan-list offset token-offset initiator terminator depth))))) ; keep reading
+
+(defun eval-conditional-and (start-offset token-offset)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'special) (eq value (char-code #\))))
+                         t)
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (eval-conditional-expr offset token-offset))
+                        ((eq kind 'symbol)
+                         (if (has-feature? (symbol-string value))
+                             (eval-conditional-and offset token-offset)
+                           nil))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun eval-conditional-or (start-offset token-offset)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'special) (eq value (char-code #\))))
+                         nil)
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (eval-conditional-expr offset token-offset))
+                        ((eq kind 'symbol)
+                         (if (has-feature? (symbol-string value))
+                             t
+                           (eval-conditional-or offset token-offset)))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun eval-conditional-expr (start-offset token-offset)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'symbol) (string-equal (symbol-string value) "and"))
+                         (eval-conditional-and offset token-offset))
+                        ((and (eq kind 'symbol) (string-equal (symbol-string value) "or"))
+                         (eval-conditional-or offset token-offset))
+                        ((eq kind 'symbol)
+                         (has-feature? (symbol-string value)))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-conditional-expr (start-offset token-offset)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((eq kind 'symbol)
+                         (values (has-feature? (symbol-string value)) (symbol-string value) offset token-offset))
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (let* ((list-end (scan-list offset token-offset))
+                                (list (ptr-read-string offset (- list-end offset))))
+                           (format *standard-output* ";; eval: ~A~%" list)
+                           (values (eval-conditional-expr offset token-offset) list list-end token-offset)))
+                        (t (error 'malformed-error :offset offset)))))
+
+(defun compile-conditional (positive offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; sym is #+ or #-
+  ;; followed by an expression evaluated at compile time
+  (multiple-value-bind (result test-expr offset token-offset)
+                       (compile-conditional-expr (+ 1 offset) token-offset)
+                       (format *standard-output* ";; Conditional compile: ~A ~A ~A~%" positive result test-expr)
+                       (repl-compile-inner (if (or (and positive result) (and (not positive) (not result)))
+                                               ;; if true the following expression is compiled
+                                               offset
+                                             ;; if not it is discarded
+                                             (progn
+                                               (format *standard-output* ";; skipping~%")
+                                               (scan-list (+ 2 offset) token-offset)))
+                                           code-segment
+                                           asm-stack
+                                           token-offset
+                                           env-start env
+                                           toplevel-start toplevel)))
+
 (defun repl-compile-inner (str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind value offset new-token-offset)
                        (read-token str token-offset)
                        (cond
-                        ((eq kind 'integer) (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env toplevel))
-                        ((eq kind 'float) (values offset code-segment (emit-value asm-stack 'float value) new-token-offset env toplevel))
-                        ((eq kind 'symbol) (values offset code-segment (emit-lookup asm-stack value env-start env toplevel-start toplevel) new-token-offset env toplevel))
-                        ((and (eq kind 'special) (eq value (char-code #\())) (compile-call offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
-                        ((and (eq kind 'special) (eq value (char-code #\'))) (compile-shortcut-quote offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
-                        ((or (eq kind 'special) (eq kind 'eos)) (values offset code-segment asm-stack new-token-offset env toplevel kind value))
+                        ((eq kind 'integer)
+                         (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env toplevel))
+                        ((eq kind 'float)
+                         (values offset code-segment (emit-value asm-stack 'float value) new-token-offset env toplevel))
+                        ((eq kind 'string)
+                         (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env toplevel))
+                        ((eq kind 'character)
+                         (values offset code-segment (emit-value asm-stack 'integer value) new-token-offset env toplevel))
+                        ((eq kind 'condition)
+                         (compile-conditional value offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
+                        ((eq kind 'symbol)
+                         (values offset code-segment (emit-lookup asm-stack value env-start env toplevel-start toplevel) new-token-offset env toplevel))
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (compile-call offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
+                        ((and (eq kind 'special) (eq value (char-code #\')))
+                         (compile-shortcut-quote offset code-segment asm-stack new-token-offset env-start env toplevel-start toplevel))
+                        ((or (eq kind 'special) (eq kind 'eos))
+                         (values offset code-segment asm-stack new-token-offset env toplevel kind value))
                         (t (error 'invalid-token-error :offset str :kind kind :value value))
                         ))
   )
@@ -1279,9 +1400,9 @@
   (assert-read-token offset 'symbol token-offset new-offset token-offset (+ 1 token-offset (length value)))
   (assert (string= (ptr-read-string token-offset) value)))
 
-(defun assert-read-character (offset value new-offset token-offset length)
+(defun assert-read-character (offset value new-offset token-offset)
   (setf *TOKEN-SEGMENT* token-offset)
-  (assert-read-token offset 'character (char-code value) new-offset token-offset (+ token-offset length)))
+  (assert-read-token offset 'character (char-code value) new-offset token-offset token-offset))
 
 (defun assert-read-string (offset value new-offset token-offset &optional (len (+ 2 (length value))))
   (setf *TOKEN-SEGMENT* token-offset)
@@ -1311,11 +1432,13 @@
   (ptr-write-string "   'boo \\'who'" 0)
   (assert-read-string 0 "boo 'who" 14 1024 8)
   (ptr-write-string "#\\space" 0)
-  (assert-read-character 0 #\space 7 1024 6)
+  (assert-read-character 0 #\space 7 1024)
   (ptr-write-string "#\\newline" 0)
-  (assert-read-character 0 #\newline 9 1024 8)
+  (assert-read-character 0 #\newline 9 1024)
   (ptr-write-string "#\\A" 0)
-  (assert-read-character 0 #\A 3 1024 2)
+  (assert-read-character 0 #\A 3 1024)
+  (ptr-write-string "#\\ " 0)
+  (assert-read-character 0 #\space 3 1024)
   (ptr-write-string "#x32" 0)
   (assert-read-integer 0 #x32 4 1024)
   (ptr-write-string "#XFFFF" 0)
@@ -1331,7 +1454,7 @@
   (assert-read-symbol 21 "+" 23 (+ 1024 6 2))
   (assert-read-integer 23 45 27 (+ 1024 6 2))
   (assert-read-symbol 27 "+hello" 34 (+ 1024 6 2 7))
-  (assert-read-character 34 #\space 42 (+ 1024 6 2 7 6) 6)
+  (assert-read-character 34 #\space 42 (+ 1024 6 2 7 6))
   (assert-read-float 42 3.14 47 (+ 1024 6 2 7 6 8))
   (assert-read-symbol 47 "-" 49 (+ 1024 6 2 7 6 8 5))
   )
@@ -1444,6 +1567,10 @@
 
 (defun test-compile-values ()
   (ptr-write-string "(apply-values (lambda (a b c) a) (values 1 2 3))" 0)
+  (debug-compile 0 1000 2000 3000 4000 4004 5000))
+
+(defun test-compile-conditional ()
+  (ptr-write-string "#+:sbcl (set x 3) #-(or :sbcl :repl) (set y 3) #+(and repl x86) (set x 4)" 0)
   (debug-compile 0 1000 2000 3000 4000 4004 5000))
 
 (defun test-write-to-array ()
