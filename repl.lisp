@@ -368,7 +368,8 @@
         (string-equal sym "multiple-value-bind")
         (string-equal sym "lambda")
         (string-equal sym "asm")
-        (string-equal sym "progn"))))
+        (string-equal sym "progn")
+        (string-equal sym "with-allocation"))))
 
 ;; todo detect if the symbol was already read, return that offset and the original token-offset
 (defun read-symbol-inner (str output &optional starting)
@@ -585,34 +586,15 @@
       (emit-integer (emit-op asm-stack :load 0 0 15) value)))
 
 (defun env-push-binding (name env)
+  (format *standard-output* ";; Binding ~A~%" name)
   (ptr-write-long name env)
   (+ *REGISTER-SIZE* env))
 
 (defun env-pop-bindings (env num)
+  (format *standard-output* ";; Unbinding ~A slots~%" num)
   (if (> num 0)
       (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
     env))
-
-(defun env-symbol-position (sym env-start env &optional (n 0))
-  (if (> env env-start)
-      (if (eq (ptr-read-long (- env *REGISTER-SIZE*)) sym)
-          n
-        (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
-    nil))
-
-(defun env-data-position (sym env-start env)
-  (let ((pos (env-symbol-position sym env-start env)))
-    (if pos
-        (- (/ (- env env-start) *REGISTER-SIZE*) pos 1))))
-
-(defun env-stack-position (sym env-start env)
-  (env-symbol-position sym env-start env))
-
-(defun env-define (name env-start env)
-  (let ((pos (env-symbol-position name env-start env)))
-    (if pos
-        env
-      (env-push-binding name env))))
 
 (defun emit-load-stack-value (asm-stack offset &optional (register 0))
   (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
@@ -681,8 +663,31 @@
 (defun emit-poppers (asm-stack num-bindings)
   (format *standard-output* ";; ~A poppers~%" num-bindings)
   (if (> num-bindings 0)
-      (emit-integer (emit-op asm-stack :inc 11) (* num-bindings *REGISTER-SIZE*))
+      (emit-integer (emit-op asm-stack :inc 11)
+                    (* num-bindings *REGISTER-SIZE*))
     asm-stack))
+
+(defun emit-stack-alloc (asm-stack size)
+  (format *standard-output* ";; Allocating ~A bytes~%" size)
+  ;; shift SP, push SP
+  (emit-integer (emit-op asm-stack :dec 11)
+                (align-bytes size)))
+
+(defun emit-stack-alloc-value (asm-stack size)
+  (format *standard-output* ";; Allocating ~A bytes~%" size)
+  ;; shift SP, push SP
+  (emit-mov (emit-stack-alloc asm-stack size)
+            0 11))
+
+(defun emit-stack-alloc-binding (asm-stack size)
+  (format *standard-output* ";; Allocating ~A bytes~%" size)
+  ;; shift SP, push SP
+  (emit-push (emit-stack-alloc asm-stack size)
+             11))
+
+(defun emit-stack-free (asm-stack size)
+  (format *standard-output* ";; Freeing ~A bytes~%" (+ (align-bytes size) (* 1 *REGISTER-SIZE*)))
+  (emit-integer (emit-op asm-stack :inc 11) (+ (align-bytes size) (* 1 *REGISTER-SIZE*))))
 
 (defun emit-mov (asm-stack dest src)
   (emit-op asm-stack :mov dest src))
@@ -698,14 +703,14 @@
   (ptr-write-long (+ new-jump-offset *SIZEOF_LONG*) (- asm-stack *SIZEOF_LONG*)))
 
 (defun emit-zero-cmp (asm-stack reg temp-reg)
-  (emit-op (emit-integer (emit-op asm-stack :load temp-reg 0 15) 0) :cmp reg temp-reg))
+  (emit-op (emit-integer (emit-op asm-stack :load temp-reg 0 15) 0)
+           :cmp reg temp-reg))
 
 (defun emit-return (asm-stack)
   (emit-op asm-stack :ret))
 
 (defun emit-reg-call (asm-stack reg)
-  (emit-integer (emit-op (emit-op (emit-op asm-stack
-                                           :cls #x7)
+  (emit-integer (emit-op (emit-op (emit-op asm-stack :cls #x7)
                                   :addi 10 14)
                          :call 0 reg) 0)  )
 
@@ -724,6 +729,42 @@
 
 (defun emit-funcall (asm-stack reg data-offset args &optional (n args))
   (emit-call (emit-pop-values asm-stack 1 n) reg data-offset))
+
+
+(defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
+  (* (ceiling (/ bytes alignment)) alignment))
+
+(defun env-push-alloc (bytes env)
+  (format *standard-output* ";; Binding ~A bytes~%" bytes)
+  (+ env (align-bytes bytes) *REGISTER-SIZE*))
+
+(defun env-push-alloc-binding (name bytes env)
+  (env-push-binding name (env-push-alloc env bytes)))
+
+(defun env-pop-alloc (bytes env)
+  (format *standard-output* ";; Unbinding ~A bytes~%" bytes)
+  (- (env-pop-bindings env 1) (align-bytes bytes) *REGISTER-SIZE*))
+
+(defun env-symbol-position (sym env-start env &optional (n 0))
+  (if (> env env-start)
+      (if (eq (ptr-read-long (- env *REGISTER-SIZE*)) sym)
+          n
+        (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
+    nil))
+
+(defun env-data-position (sym env-start env)
+  (let ((pos (env-symbol-position sym env-start env)))
+    (if pos
+        (- (/ (- env env-start) *REGISTER-SIZE*) pos 1))))
+
+(defun env-stack-position (sym env-start env)
+  (env-symbol-position sym env-start env))
+
+(defun env-define (name env-start env)
+  (let ((pos (env-symbol-position name env-start env)))
+    (if pos
+        env
+      (env-push-binding name env))))
 
 
 ;; todo adjust stack offset in env with each push
@@ -1166,11 +1207,13 @@
                          ;; pop values into register
                          (values offset code-segment
                                  (emit-mov (emit-pop-values asm-stack 1 (- num 1)) 0 1)
-                                 token-offset env toplevel))
+                                 token-offset
+                                 (env-pop-bindings env (- num 1))
+                                 toplevel))
                         ((not token-kind)
                          (format *standard-output* ";; Return value ~A~%" num)
                          ;; push the value and move on
-                         (compile-values offset code-segment (emit-push asm-stack 0) token-offset env-start env toplevel-start toplevel (+ 1 num)))
+                         (compile-values offset code-segment (emit-push asm-stack 0) token-offset env-start (env-push-binding 0 env) toplevel-start toplevel (+ 1 num)))
                         (t (error 'malformed-error :offset start-offset)))))
 
 ;;; apply-values
@@ -1243,6 +1286,59 @@
                            )
                         (t (error 'malformed-error :offset start-offset)))))
 
+(defun compile-with-allocation-body (var byte-size start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; (with-allocation (binding byte-size) body...)
+  (format *standard-output* ";; with-allocation body ~A ~A~%" var byte-size)
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+                       (compile-body 0 start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+                       (values offset code-segment (emit-stack-free asm-stack byte-size) token-offset (env-pop-alloc byte-size env) toplevel)))
+
+(defun compile-with-allocation-binding-end (var byte-size start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (if (not (and (eq kind 'special) (eq value (char-code #\)))))
+                           (error 'malformed-error :offset start-offset))
+                       (compile-with-allocation-body var byte-size offset code-segment
+                                                     (emit-stack-alloc-binding asm-stack byte-size)
+                                                     token-offset
+                                                     env-start
+                                                     (env-push-alloc-binding var byte-size env)
+                                                     toplevel-start toplevel)))
+
+(defun compile-with-allocation-byte-size (var start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; (with-allocation (binding byte-size) body...)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((eq kind 'integer)
+                         (format *standard-output* ";; with-allocation ~A ~A~%" var value)
+                         (compile-with-allocation-binding-end var value offset code-segment
+                                                              asm-stack
+                                                              token-offset
+                                                              env-start
+                                                              env
+                                                              toplevel-start toplevel))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-with-allocation-binding (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; (with-allocation (binding byte-size) body...)
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((eq kind 'symbol) (compile-with-allocation-byte-size value offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+                        (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-with-allocation (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; (with-allocation (binding byte-size) body...)
+  (format *standard-output* ";; with-allocation~%")
+  (multiple-value-bind (kind value offset token-offset)
+                       ;; compile the expression
+                       (read-token start-offset token-offset)
+                       (cond
+                        ((and (eq kind 'special) (eq value (char-code #\()))
+                         (compile-with-allocation-binding offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+                        (t (error 'malformed-error :offset start-offset)))))
+
 (defun compile-special-form (form offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (let ((form-str (symbol-string form)))
     (cond
@@ -1268,6 +1364,8 @@
       (compile-asm offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
      ((string-equal form-str "progn")
       (compile-progn offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "with-allocation")
+      (compile-with-allocation offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
      (t (error 'unknown-special-form-error :offset offset :form form-str)))))
 
 (defun compile-call (str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
@@ -1474,7 +1572,7 @@
                      :direction :input
                      :external-format :default
                      :element-type '(unsigned-byte 8))
-                  (ptr-write-byte 0 (+ 1 (read-sequence *memory* f))))
+                  (ptr-write-byte 0 (read-sequence *memory* f)))
   (compile-to-file (concatenate 'string path ".bin")
                    6000 0 1000 3000 5000 7000 7004 8000))
 
