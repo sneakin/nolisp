@@ -1,3 +1,4 @@
+#+:sbcl
 (defpackage :repl
   (:use :cl)
   (:export :undefined-variable-error
@@ -70,8 +71,10 @@
            :repl-file
            ))
 
+#+:sbcl
 (in-package :repl)
 
+#+:sbcl
 (define-condition repl-error ()
   ((offset :initarg :offset :initform nil)
    (msg :initarg :msg :initform nil))
@@ -80,11 +83,13 @@
              (if (slot-value condition 'msg)
                  (format stream (slot-value condition 'msg))))))
 
+#+:sbcl
 (define-condition unknown-op-error (repl-error)
   ((op :initarg :op :initform nil))
   (:report (lambda (condition stream)
              (format stream "Unknown op error: ~A ~A~%" (slot-value condition 'op) (type-of (slot-value condition 'op))))))
 
+#+:sbcl
 (define-condition undefined-variable-error (repl-error)
   ((variable :initarg :variable :initform nil)
    (offset :initarg :offset :initform nil))
@@ -95,6 +100,7 @@
                      (symbol-string (slot-value condition 'variable))
                      (slot-value condition 'variable)))))
 
+#+:sbcl
 (define-condition not-implemented-error (repl-error)
   ((feature :initarg :feature :initform nil))
   (:report (lambda (condition stream)
@@ -102,6 +108,7 @@
                      (slot-value condition 'feature)
                      (slot-value condition 'offset)))))
 
+#+:sbcl
 (define-condition unknown-special-form-error (repl-error)
   ((form :initarg :form :initform nil))
   (:report (lambda (condition stream)
@@ -109,6 +116,7 @@
                      (slot-value condition 'offset)
                      (slot-value condition 'form)))))
 
+#+:sbcl
 (define-condition malformed-error (repl-error)
   ((form :initarg :form :initform nil))
   (:report (lambda (condition stream)
@@ -116,9 +124,12 @@
                      (slot-value condition 'offset)
                      (or (slot-value condition 'form) (ptr-read-string (slot-value condition 'offset)))))))
 
+#+:sbcl
 (define-condition malformed-let-error (malformed-error) ())
+#+:sbcl
 (define-condition malformed-lambda-error (malformed-error) ())
 
+#+:sbcl
 (define-condition invalid-token-error (malformed-error)
   ((kind :initarg :kind :initform nil)
    (value :initarg :value :initform nil))
@@ -129,6 +140,7 @@
                      (slot-value condition 'value)
                      (ptr-read-string (slot-value condition 'offset))))))
 
+#+:sbcl
 (define-condition invalid-escape-error (malformed-error)
   ((char :initarg :char :initform nil))
   (:report (lambda (condition stream)
@@ -136,6 +148,7 @@
                      (slot-value condition 'offset)
                      (slot-value condition 'char)))))
 
+#+:sbcl
 (define-condition invalid-character-error (malformed-error)
   ((value :initarg :char :initform nil))
   (:report (lambda (condition stream)
@@ -143,13 +156,16 @@
                      (slot-value condition 'offset)
                      (slot-value condition 'value)))))
 
+#+:sbcl
 (define-condition undefined-error (repl-error)
   ((name :initarg :name :initform nil))
   (:report (lambda (condition stream)
              (format stream "Undefined variable ~A~%"
                      (slot-value condition 'name)))))
 
+#+:sbcl
 (define-condition undefined-variable-error (undefined-error) ())
+#+:sbcl
 (define-condition undefined-function-error (undefined-error) ())
 
 ;;;
@@ -158,7 +174,7 @@
 
 ;;; Info functions
 
-(defvar *repl-features* (list :repl :x86 :cross))
+(defvar *repl-features* (list :repl :cross))
 
 (defun has-feature? (feature &optional (features *repl-features*))
   (if (stringp feature)
@@ -172,7 +188,7 @@
 
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
-(defvar *MEMORY* (make-array (* 16 1024) :element-type '(unsigned-byte 8)))
+(defvar *MEMORY* (make-array (* 256 1024) :element-type '(unsigned-byte 8)))
 (defvar *TOKEN-SEGMENT* 0)
 (defvar *CODE-SEGMENT* 0)
 ;;; Base of the read numbers
@@ -766,6 +782,7 @@
         env
       (env-push-binding name env))))
 
+;;; funcall
 
 ;; todo adjust stack offset in env with each push
 (defun compile-call-argument (str code-segment asm-stack token-offset env-start env toplevel-start toplevel arg)
@@ -801,6 +818,8 @@
       (if data-pos
           (compile-funcall-int str code-segment asm-stack token-offset env-start env toplevel-start toplevel 9 data-pos)
         (error 'undefined-function :offset str :name (symbol-string func-name))))))
+
+;;; IF
 
 (defun compile-if-fixer (if-offset then-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (let ((offset-to-else (+ (- then-offset if-offset) *SIZEOF_LONG*))
@@ -1393,7 +1412,7 @@
                         ((and (eq kind 'special) (eq value initiator))
                          (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
                         ((and (eq kind 'special) (eq value terminator))
-                         (if (<= depth 1)
+                         (if (< depth 1)
                              (progn (format *standard-output* "  done~%")
                                     offset) ; done
                            (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up
@@ -1567,14 +1586,21 @@
                        (repl-compile o-offset o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
                        (write-to-file path output o-code-segment code-segment o-asm-stack asm-stack o-token-offset token-offset env-start env o-toplevel toplevel)))
 
-(defun repl-file (path)
+(defun repl-file (path &optional (buffer-size 4000))
   (with-open-file (f path
                      :direction :input
                      :external-format :default
                      :element-type '(unsigned-byte 8))
                   (ptr-write-byte 0 (read-sequence *memory* f)))
   (compile-to-file (concatenate 'string path ".bin")
-                   6000 0 1000 3000 5000 7000 7004 8000))
+                   (* buffer-size 6)
+                   0
+                   (* buffer-size 1)
+                   (* buffer-size 3)
+                   (* buffer-size 5)
+                   (* buffer-size 7)
+                   (+ (* buffer-size 7) 4)
+                   (* buffer-size 8)))
 
 ;;;
 ;;; Test functions
