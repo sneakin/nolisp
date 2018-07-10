@@ -186,6 +186,11 @@
 
 ;;; Memory
 
+(defvar *SIZEOF_SHORT* 2)
+(defvar *SIZEOF_LONG* 4)
+(defvar *SIZEOF_FLOAT* 4)
+(defvar *REGISTER-SIZE* *SIZEOF_LONG*)
+
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
 (defvar *MEMORY* (make-array (* 256 1024) :element-type '(unsigned-byte 8)))
@@ -494,7 +499,7 @@
 
 (defun read-character-symbol (str token-offset)
   (multiple-value-bind (kind value offset new-token-offset)
-                       (read-token str token-offset)
+                       (read-token str token-offset t)
                        (if (not (eq kind 'symbol)) (error 'invalid-token-error :offset str :kind kind :value value))
                        (let ((c (character-by-name (symbol-string value))))
                          (if c
@@ -528,14 +533,16 @@
      ))
   )
 
-(defun read-token (str token-offset)
+(defun read-token (str token-offset &optional recursing)
   (let ((c (ptr-read-byte str)))
     (cond
      ((space? c) (read-token (+ 1 str) token-offset))
      ((digit? c) (read-number str 0 *NUMBER-BASE* token-offset))
      ((eq c (char-code #\+)) (read-plus str token-offset))
      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
-     ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset))
+     ((eq c (char-code #\#)) (if recursing
+                                 (error 'invalid-token-error :offset str)
+                               (read-reader-macro (+ 1 str) token-offset)))
      ((or (alpha? c)
           (symbol-special? c)) (read-symbol str token-offset))
      ((eq c (char-code #\")) (read-string (+ 1 str) token-offset #\"))
@@ -543,11 +550,6 @@
      ((special? c) (values 'special c (+ 1 str) token-offset))
      ((null? c) (values 'eos nil (+ 1 str) token-offset))
      (t (values 'unknown nil (+ 1 str) token-offset)))))
-
-(defvar *SIZEOF_SHORT* 2)
-(defvar *SIZEOF_LONG* 4)
-(defvar *SIZEOF_FLOAT* 4)
-(defvar *REGISTER-SIZE* *SIZEOF_LONG*)
 
 ;;;
 ;;; The compiler
@@ -953,13 +955,15 @@
                        (if (and (eq kind 'eos))
                            ;; copy code to code-segment from asm-stack
                            (let* ((asm-stack (emit-return asm-stack))
-                                  (new-code-segment (ptr-copy starting-asm-stack code-segment (- asm-stack starting-asm-stack))))
+                                  (new-code-segment (ptr-copy (or starting-asm-stack orig-asm-stack)
+                                                              code-segment
+                                                              (- asm-stack (or starting-asm-stack orig-asm-stack)))))
                              (format *standard-output* ";;    code segment ~A ~A ~A ~A~%" o-code-segment code-segment *code-segment* (- code-segment *code-segment*))
                              (values offset
                                      
                                      new-code-segment
                                      ;; emit the address for toplevel's initializer
-                                     (emit-value starting-asm-stack 'integer (- code-segment *code-segment*))
+                                     (emit-value (or starting-asm-stack orig-asm-stack) 'integer (- code-segment *code-segment*))
                                      token-offset
                                      env
                                      toplevel))
