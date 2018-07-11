@@ -1,3 +1,4 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
 (require "conditions")
 (require "memory")
 (require "null")
@@ -160,20 +161,18 @@
    ((string-equal char-sym "page") #\page)
    ((string-equal char-sym "rubout") #\rubout)
    ((eq (length char-sym) 1) (aref char-sym 0))
-   (t nil)
+   (t (error 'invalid-character-error :value char-sym)
    ))
 
-(defun read-character-digits (str token-offset)
-  (error 'not-implemented-error))
-
-(defun read-character-symbol (str token-offset)
-  (multiple-value-bind (kind value offset new-token-offset)
-                       (read-token str token-offset t)
-                       (if (not (eq kind 'symbol)) (error 'invalid-token-error :offset str :kind kind :value value))
-                       (let ((c (character-by-name (symbol-string value))))
-                         (if c
-                             (values 'character (char-code c) offset token-offset)
-                           (error 'invalid-token-error :offset str :kind kind :value value)))))
+(defun read-character-symbol (str token-offset &optional (starting 0))
+  (let ((c (ptr-read-byte str)))
+    (cond
+     ((or (space? c) (null c))
+      (ptr-write-byte 0 token-offset)
+      (values 'char (character-by-name (ptr-read-string starting)) str (+ 1 token-offset)))
+     (t
+      (ptr-write-byte c token-offset)
+      (read-character-symbol (+ 1 str) (+ 1 token-offset) (or starting str))))))
 
 (defun read-character (str token-offset &optional char)
   (let ((c (ptr-read-byte str)))
@@ -202,16 +201,14 @@
      ))
   )
 
-(defun read-token (str token-offset &optional recursing)
+(defun read-token (str token-offset)
   (let ((c (ptr-read-byte str)))
     (cond
      ((space? c) (read-token (+ 1 str) token-offset))
      ((digit? c) (read-number str 0 *NUMBER-BASE* token-offset))
      ((eq c (char-code #\+)) (read-plus str token-offset))
      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
-     ((eq c (char-code #\#)) (if recursing
-                                 (error 'invalid-token-error :offset str)
-                               (read-reader-macro (+ 1 str) token-offset)))
+     ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset))
      ((or (alpha? c)
           (symbol-special? c)) (read-symbol str token-offset))
      ((eq c (char-code #\")) (read-string (+ 1 str) token-offset #\"))

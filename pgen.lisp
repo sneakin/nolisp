@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (defun safe-elt (seq n)
   (if (and seq (< 0 (length seq)))
       (elt seq n)))

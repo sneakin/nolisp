@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (require "memory")
 
 (in-package :repl)

@@ -1,3 +1,4 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
 (require "memory")
 (require "symbol")
 (require "emitter")

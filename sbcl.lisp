@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (define-condition repl-load-error (simple-error)
   ((module :initarg :module :initform nil)
    (path :initarg :path :initform nil))
@@ -22,7 +24,7 @@
 (defun repl-module-loader (mod-name)
   (let* ((file-name (repl-source-path mod-name)))
     (unless file-name (error 'repl-module-not-found-error :module mod-name :path file-name))
-    (format *standard-error* "Requiring ~A ~A~%" mod-name file-name)
+    (format *error-output* "Requiring ~A ~A~%" mod-name file-name)
     (if (load file-name)
         (provide mod-name)
       (error 'repl-load-error :module mod-name :path file-name)))

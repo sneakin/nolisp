@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 ;;; Info functions
 
 (in-package :repl)

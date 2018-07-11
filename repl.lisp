@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 #+:sbcl
 (defpackage :repl
   (:use :cl)

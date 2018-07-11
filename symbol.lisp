@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (in-package :repl)
 
 (defun symbol-id (symbol-offset &optional (segment *TOKEN-SEGMENT*))

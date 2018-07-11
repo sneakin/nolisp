@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (in-package :repl)
 
 (defvar *SIZEOF_SHORT* 2)
