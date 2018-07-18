@@ -10,7 +10,13 @@
       (ptr-read-string symbol-offset)))
 
 (defun symbol-intern (str start ending)
+  (if (symbolp str)
+      (if (keywordp str)
+          (setf str (concatenate 'string ":" (symbol-name str)))
+        (setf str (symbol-name str))))
   (let* ((off (ptr-write-string str ending))
-         (id (symbol-id off start)))
-    (if id id off)))
+         (id (symbol-id ending start)))
+    (if id
+        (values id ending)
+      (values ending off))))
 

@@ -95,3 +95,9 @@
 (define-condition undefined-variable-error (undefined-error) ())
 #+:sbcl
 (define-condition undefined-function-error (undefined-error) ())
+
+#+:sbcl
+(define-condition argument-error (repl-error)
+  ((number :initarg :number :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "Too many arguments: ~A~%" (slot-value condition 'number)))))

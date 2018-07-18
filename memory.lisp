@@ -48,6 +48,7 @@
           (ash (ptr-read-byte (+ ptr 3)) 24)))
 
 (defun ptr-write-long (n ptr)
+  (if (eq n nil) (setf n 0))
   (ptr-write-byte (ldb (byte 8 0) n) ptr)
   (ptr-write-byte (ldb (byte 8 8) n) (+ 1 ptr))
   (ptr-write-byte (ldb (byte 8 16) n) (+ 2 ptr))
@@ -103,6 +104,15 @@
           (ptr-write-byte 0 offset)
           (ptr-zero (+ offset 1) (- count 1)))
       offset)))
+
+(defun ptr-cons (stack &optional head tail)
+  (ptr-write-long tail (ptr-write-long head stack)))
+
+(defun ptr-head (stack)
+  (ptr-read-long stack))
+
+(defun ptr-rest (stack)
+  (+ stack *SIZEOF_LONG*))
 
 #-:sbcl
 (defun pointer-of (needle haystack)

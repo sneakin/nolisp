@@ -29,12 +29,13 @@
           toplevel))
 
 (defun compile-funcall-tail (str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings data-offset reg args)
-  (values str
-          code-segment
-          (emit-tailcall asm-stack reg (* *REGISTER-SIZE* data-offset) args (- env callers-bindings))
-          token-offset
-          (env-pop-bindings env args)
-          toplevel))
+  (let ((post-env (env-pop-bindings env args)))
+    (values str
+            code-segment
+            (emit-tailcall asm-stack reg (* *REGISTER-SIZE* data-offset) args (- post-env env-start))
+            token-offset
+            post-env
+            toplevel)))
 
 (defun compile-funcall-it (str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings data-offset reg args &optional tail-call)
   (format *standard-output* ";; Call R~A+~A: ~A args ~A, caller binds ~A~%" reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" "") callers-bindings)
@@ -125,7 +126,7 @@
 
 (defun compile-if (start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
   ;; compile the test
-  (format *standard-output* ";; IF condition~%")
+  (format *standard-output* ";; IF condition ~A~%" (if tail-call "tail" ""))
   (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
                        (repl-compile-inner start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (if kind (error 'invalid-token-error :offset start-offset :kind kind :value value))
@@ -185,16 +186,14 @@
 ;;; progn
 
 (defun tail-call? (offset token-offset)
-  (multiple-value-bind (kind value offset token-offset)
-                       (read-token offset token-offset)
-                       (if (or (and (eq kind 'special) (eq value (char-code #\))))
-                               (eq kind 'eos))
-                           (multiple-value-bind (kind value offset token-offset)
-                                                (read-token offset token-offset)
-                                                (and (eq kind 'special) (eq value (char-code #\))))))))
+  (multiple-value-bind (call-end)
+                       (scan-list offset token-offset) ; todo pre-tokenize so this is done once
+                       (multiple-value-bind (kind value offset token-offset)
+                           (read-token call-end token-offset)
+                         (and (eq kind 'special) (eq value (char-code #\)))))))
 
 (defun compile-progn (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call &optional (n 0))
-  (format *standard-output* ";; expr ~A~%" n)
+  (format *standard-output* ";; expr ~A ~A~%" n (if tail-call "tail" ""))
   (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
                        (repl-compile-inner offset code-segment asm-stack token-offset env-start env toplevel-start toplevel (if tail-call (tail-call? offset token-offset)))
                        (if (and (eq kind 'special) (eq value (char-code #\))))
@@ -673,7 +672,7 @@
                         ((and (eq kind 'special) (eq value initiator))
                          (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
                         ((and (eq kind 'special) (eq value terminator))
-                         (if (< depth 1)
+                         (if (<= depth 1)
                              (progn (format *standard-output* "  done~%")
                                     offset) ; done
                            (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up

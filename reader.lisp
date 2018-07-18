@@ -10,7 +10,9 @@
 ;;; Base of the read numbers
 (defvar *NUMBER-BASE* 10)
 (defvar *SYMBOL-SPECIALS* ".,:-~!@$%^&*_=+\/?<>|#")
-(defvar *SPECIALS* "()[]\"'`[]")
+(defvar *LIST-INITIATORS* "([{")
+(defvar *LIST-TERMINATORS* ")]}")
+(defvar *SPECIALS* "()[]\"'`")
 #+:sbcl
 (defvar *SPACES* (format nil "~c~c~c~c" #\space #\newline #\tab #\return))
 
@@ -19,6 +21,18 @@
 
 (defun special? (c)
   (not (eq nil (index-of c *SPECIALS*))))
+
+(defun list-initiator? (c)
+  (not (eq nil (index-of c *LIST-INITIATORS*))))
+
+(defun list-initiator-for (c)
+  (aref *LIST-INITIATORS* (index-of c *LIST-TERMINATORS*)))
+
+(defun list-terminator? (c)
+  (not (eq nil (index-of c *LIST-TERMINATORS*))))
+
+(defun list-terminator-for (c)
+  (aref *LIST-TERMINATORS* (index-of c *LIST-INITIATORS*)))
 
 (defun newline? (c)
   (or (eq c (char-code #\newline)) (eq c (char-code #\return))))
@@ -161,7 +175,7 @@
    ((string-equal char-sym "page") #\page)
    ((string-equal char-sym "rubout") #\rubout)
    ((eq (length char-sym) 1) (aref char-sym 0))
-   (t (error 'invalid-character-error :value char-sym)
+   (t (error 'invalid-character-error :value char-sym))
    ))
 
 (defun read-character-symbol (str token-offset &optional (starting 0))
@@ -216,3 +230,4 @@
      ((special? c) (values 'special c (+ 1 str) token-offset))
      ((null? c) (values 'eos nil (+ 1 str) token-offset))
      (t (values 'unknown nil (+ 1 str) token-offset)))))
+
