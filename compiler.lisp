@@ -481,7 +481,7 @@
                          (format *standard-output* ";; returning~%")
                          ;; pop values into register
                          (values offset code-segment
-                                 (emit-mov (emit-pop-values asm-stack 1 (- num 1)) 0 1)
+                                 (emit-mov (emit-pop-values asm-stack (- num 1)) 0 1)
                                  token-offset
                                  (env-pop-bindings env (- num 1))
                                  toplevel))

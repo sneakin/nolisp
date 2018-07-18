@@ -206,18 +206,18 @@
 (defun emit-stack-call (asm-stack offset)
   (emit-call asm-stack 11 offset))
 
-(defun emit-pop-values (asm-stack reg num)
+(defun emit-pop-values (asm-stack num)
   (if (>= num 8) (error 'argument-error :number num)
       (if (> num 0)
-          (emit-pop-values (emit-op asm-stack :pop (+ 1 (- num reg))) reg (- num 1))
+          (emit-pop-values (emit-op asm-stack :pop num) (- num 1))
           asm-stack)))
 
 (defun emit-funcall (asm-stack reg data-offset args)
-  (emit-call (emit-pop-values asm-stack 1 args) reg data-offset))
+  (emit-call (emit-pop-values asm-stack args) reg data-offset))
 
 (defun emit-tailcall (asm-stack reg data-offset args callers-bindings)
   ;; pop values, pop caller's values moving stack frame over caller's, call
-  (emit-call-jump (emit-op (emit-poppers (emit-pop-values asm-stack 1 args)
+  (emit-call-jump (emit-op (emit-poppers (emit-pop-values asm-stack args)
                                          (/ callers-bindings *REGISTER-SIZE*))
                            :nop) 
                   reg data-offset))
