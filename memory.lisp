@@ -22,6 +22,10 @@
     (setf (aref arr n) (ptr-read-byte (+ ptr n))))
     arr)
 
+(defun ptr-write-array (ptr array)
+  (dotimes (n (length array))
+    (ptr-write-byte (aref array n) (+ ptr n))))
+
 (defun ptr-copy (src dest count)
   (if (> count *SIZEOF_LONG*)
       (progn
@@ -94,6 +98,13 @@
                 stack-start
               (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
 
+(defun ptr-read-file (path offset)
+  (with-open-file (f path
+                     :direction :input
+                     :external-format :default
+                     :element-type '(unsigned-byte 8))
+    (ptr-write-byte 0 (read-sequence *memory* f :start offset))))
+
 (defun ptr-zero (offset count)
   (if (> count 4)
       (progn
@@ -124,3 +135,4 @@
 
 (defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
   (* (ceiling (/ bytes alignment)) alignment))
+

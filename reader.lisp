@@ -61,21 +61,6 @@
       (digit? c)
       (symbol-special? c)))
 
-(defun special-form? (symbol-offset)
-  (let ((sym (symbol-string symbol-offset)))
-    (or (string-equal sym "if")
-        (string-equal sym "cond")
-        (string-equal sym "let")
-        (string-equal sym "set")
-        (string-equal sym "quote")
-        (string-equal sym "values")
-        (string-equal sym "apply-values")
-        (string-equal sym "multiple-value-bind")
-        (string-equal sym "lambda")
-        (string-equal sym "asm")
-        (string-equal sym "progn")
-        (string-equal sym "with-allocation"))))
-
 ;; todo detect if the symbol was already read, return that offset and the original token-offset
 (defun read-symbol-inner (str output &optional starting)
   (let ((c (ptr-read-byte str)))
