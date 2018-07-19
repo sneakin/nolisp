@@ -20,7 +20,7 @@
 
 ;;; funcall
 
-(defun compile-funcall-push (str code-segment asm-stack token-offset env-start env toplevel-start toplevel data-offset reg args)
+(defun compile-funcall-push (str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)
   (values str
           code-segment
           (emit-funcall asm-stack reg (* *REGISTER-SIZE* data-offset) args)
@@ -28,7 +28,7 @@
           (env-pop-bindings env args)
           toplevel))
 
-(defun compile-funcall-tail (str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings data-offset reg args)
+(defun compile-funcall-tail (str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)
   (let ((post-env (env-pop-bindings env args)))
     (values str
             code-segment
@@ -37,14 +37,26 @@
             post-env
             toplevel)))
 
-(defun compile-funcall-it (str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings data-offset reg args &optional tail-call)
-  (format *standard-output* ";; Call R~A+~A: ~A args ~A, caller binds ~A~%" reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" "") callers-bindings)
+(defun compile-funcall-it (str code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name reg data-offset args tail-call)
+  (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
     (if tail-call
-        (compile-funcall-tail str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings data-offset reg args)
-      (compile-funcall-push str code-segment asm-stack token-offset env-start env toplevel-start toplevel data-offset reg args)))
+        (compile-funcall-tail str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)
+        (compile-funcall-push str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)))
+
+;; todo call to an explicit arity needs to check if # args matches, not mangle symbol
+;; lambda needs to define symbols while going through arg list
+
+(defun compile-funcall-resolve (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name args tail-call)
+  (let ((stack-pos (env-stack-position func-name env-start env))
+        (data-pos (env-data-position func-name toplevel-start toplevel)))
+    (if stack-pos
+        (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 11 stack-pos args tail-call)
+        (if data-pos
+            (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 9 data-pos args tail-call)
+            (error 'undefined-function :offset offset :name (symbol-string func-name))))))
 
 ;; todo adjust stack offset in env with each push
-(defun compile-call-argument (str code-segment asm-stack token-offset env-start env toplevel-start toplevel callers-bindings reg data-offset arg tail-call)
+(defun compile-call-argument (str code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name arg tail-call)
   ;; until an #\) is read
   ;;   call each argument
   (format *standard-output* ";; Argument ~A~%" arg)
@@ -52,18 +64,12 @@
                        (repl-compile-inner str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                        (if (and (eq token-kind 'special) (eq token-value (char-code #\))))
                            ;; make the call
-                           (compile-funcall-it offset code-segment new-asm-stack new-token-offset env-start new-env toplevel-start toplevel callers-bindings data-offset reg arg tail-call)
+                           (compile-funcall-resolve offset code-segment new-asm-stack new-token-offset env-start new-env toplevel-start toplevel func-name arg tail-call)
                          ;; push result onto stack and move to the next argument
-                         (compile-call-argument offset code-segment (emit-push new-asm-stack 0) new-token-offset env-start (env-push-binding 0 new-env) toplevel-start toplevel callers-bindings reg data-offset (+ 1 arg) tail-call))))
+                         (compile-call-argument offset code-segment (emit-push new-asm-stack 0) new-token-offset env-start (env-push-binding 0 new-env) toplevel-start toplevel func-name (+ 1 arg) tail-call))))
 
 (defun compile-funcall (func-name str code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
-  (let ((stack-pos (env-stack-position func-name env-start env))
-        (data-pos (env-data-position func-name toplevel-start toplevel)))
-    (if stack-pos
-        (compile-call-argument str code-segment asm-stack token-offset env-start env toplevel-start toplevel env 11 stack-pos 0 tail-call)
-      (if data-pos
-          (compile-call-argument str code-segment asm-stack token-offset env-start env toplevel-start toplevel env 9 data-pos 0 tail-call)
-        (error 'undefined-function :offset str :name (symbol-string func-name))))))
+  (compile-call-argument str code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 0 tail-call))
 
 ;;; IF
 
@@ -658,25 +664,8 @@
                         ;; function calls
                         ((eq kind 'symbol)
                          (compile-funcall value offset code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
-                        ;; or call function by address
-                        ((or (eq kind 'integer))
-                         (compile-call-argument offset code-segment (emit-push (emit-value asm-stack 'integer value) 0) token-offset env-start env toplevel-start toplevel env 9 value 0 tail-call))
                         (t (error 'malformed-error :offset str))))
   )
-
-(defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
-  (multiple-value-bind (kind value offset token-offset)
-                       (read-token offset token-offset)
-                       (format *standard-output* "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
-                       (cond
-                        ((and (eq kind 'special) (eq value initiator))
-                         (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
-                        ((and (eq kind 'special) (eq value terminator))
-                         (if (<= depth 1)
-                             (progn (format *standard-output* "  done~%")
-                                    offset) ; done
-                           (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up
-                        (t (scan-list offset token-offset initiator terminator depth))))) ; keep reading
 
 (defun eval-conditional-and (start-offset token-offset)
   (multiple-value-bind (kind value offset token-offset)

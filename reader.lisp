@@ -231,3 +231,16 @@
      ((null? c) (values 'eos nil (+ 1 str) token-offset))
      (t (values 'unknown nil (+ 1 str) token-offset)))))
 
+(defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
+  (multiple-value-bind (kind value offset token-offset)
+                       (read-token offset token-offset)
+                       (format *standard-output* "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
+                       (cond
+                        ((and (eq kind 'special) (eq value initiator))
+                         (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
+                        ((and (eq kind 'special) (eq value terminator))
+                         (if (<= depth 1)
+                             (progn (format *standard-output* "  done~%")
+                                    offset) ; done
+                           (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up
+                        (t (scan-list offset token-offset initiator terminator depth))))) ; keep reading
