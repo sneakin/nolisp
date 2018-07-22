@@ -20,7 +20,7 @@
 (defun ptr-read-array (ptr elements &optional (arr (make-array elements :element-type '(unsigned-byte 8))))
   (dotimes (n elements)
     (setf (aref arr n) (ptr-read-byte (+ ptr n))))
-    arr)
+  arr)
 
 (defun ptr-write-array (ptr array)
   (dotimes (n (length array))
@@ -31,11 +31,11 @@
       (progn
         (ptr-write-long (ptr-read-long src) dest)
         (ptr-copy (+ src *SIZEOF_LONG*) (+ dest *SIZEOF_LONG*) (- count *SIZEOF_LONG*)))
-    (if (> count 0)
-        (progn
-          (ptr-write-byte (ptr-read-byte src) dest)
-          (ptr-copy (+ src 1) (+ dest 1) (- count 1)))
-      dest)))
+      (if (> count 0)
+          (progn
+            (ptr-write-byte (ptr-read-byte src) dest)
+            (ptr-copy (+ src 1) (+ dest 1) (- count 1)))
+          dest)))
 
 (defun ptr-read-short (ptr)
   (logior (ptr-read-byte ptr)
@@ -69,9 +69,9 @@
   (let* ((c (ptr-read-byte ptr)))
     (if (or (and count (>= n count)) (null? c))
         acc
-      (progn
-        (setf acc (concatenate 'string acc (list (code-char c))))
-        (ptr-read-string (+ 1 ptr) count acc (+ 1 n))))))
+        (progn
+          (setf acc (concatenate 'string acc (list (code-char c))))
+          (ptr-read-string (+ 1 ptr) count acc (+ 1 n))))))
 
 #+:sbcl
 (defun ptr-read-float (ptr)
@@ -88,7 +88,7 @@
         (if (> (length current) 0)
             (if (string= current str)
                 stack-start
-              (ptr-find-string= str (+ 1 stack-start (length current)) stack-end))))))
+                (ptr-find-string= str (+ 1 stack-start (length current)) stack-end))))))
 
 (defun ptr-find-string-equal (str stack-start stack-end)
   (if (< stack-start stack-end)
@@ -96,7 +96,7 @@
         (if (> (length current) 0)
             (if (string-equal current str)
                 stack-start
-              (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
+                (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
 
 (defun ptr-read-file (path offset)
   (with-open-file (f path
@@ -110,11 +110,11 @@
       (progn
         (ptr-write-long 0 offset)
         (ptr-zero (+ offset *SIZEOF_LONG*) (- count *SIZEOF_LONG*)))
-    (if (> count 0)
-        (progn
-          (ptr-write-byte 0 offset)
-          (ptr-zero (+ offset 1) (- count 1)))
-      offset)))
+      (if (> count 0)
+          (progn
+            (ptr-write-byte 0 offset)
+            (ptr-zero (+ offset 1) (- count 1)))
+          offset)))
 
 (defun ptr-cons (stack &optional head tail)
   (ptr-write-long tail (ptr-write-long head stack)))
@@ -129,9 +129,9 @@
 (defun pointer-of (needle haystack)
   (let ((h (ptr-read-byte haystack)))
     (cond
-     ((null? h) nil)
-     ((eq needle h) haystack)
-     (t (pointer-of needle (+ 1 haystack))))))
+      ((null? h) nil)
+      ((eq needle h) haystack)
+      (t (pointer-of needle (+ 1 haystack))))))
 
 (defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
   (* (ceiling (/ bytes alignment)) alignment))

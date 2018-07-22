@@ -9,7 +9,7 @@
     (format *standard-output* "eval exact match ~A ~A~%" value input)
     (if (eq value c)
         (values c (subseq input 1))
-      (values nil input))))
+        (values nil input))))
 
 (defun eval-match-eos (input)
   (format *standard-output* "eval match eos ~A~%" input)
@@ -24,96 +24,96 @@
              (<= (char-code min) (char-code c))
              (>= (char-code max) (char-code c)))
         (values c (subseq input 1))
-      (values nil input))))
+        (values nil input))))
 
 (defun eval-zero-or-one (rule input rules)
   (format *standard-output* "eval zero or one ~A~%" rule)
   (multiple-value-bind (result new-input)
-                       (eval-statements nil rule input rules)
-                       (if result
-                           (values result new-input)
-                         (values t input))))
+      (eval-statements nil rule input rules)
+    (if result
+        (values result new-input)
+        (values t input))))
 
 (defun eval-one-or-more (rule input rules &optional acc)
   (format *standard-output* "eval one or more ~A ~A~%" rule acc)
   (multiple-value-bind (result new-input)
-                       (eval-statements nil rule input rules)
-                       (if result
-                           (eval-one-or-more rule new-input rules (cons result acc))
-                         (values (reverse acc) input))))
+      (eval-statements nil rule input rules)
+    (if result
+        (eval-one-or-more rule new-input rules (cons result acc))
+        (values (reverse acc) input))))
 
 (defun eval-zero-or-more (rule input rules &optional acc)
   (format *standard-output* "eval zero or more ~A ~A~%" rule acc)
   (multiple-value-bind (result new-input)
-                       (eval-statements nil rule input rules)
-                       (if result
-                           (eval-zero-or-more rule new-input rules (cons result acc))
-                         (values (or (reverse acc) t) input))))
+      (eval-statements nil rule input rules)
+    (if result
+        (eval-zero-or-more rule new-input rules (cons result acc))
+        (values (or (reverse acc) t) input))))
 
 (defun eval-or (statements input rules)
   (if statements
       (multiple-value-bind (result new-input)
-                           (eval-statement (first statements) input rules)
-                           (format *standard-output* "eval or ret ~A ~A~%" result new-input)
-                           (if result
-                               (values result new-input)
-                             (eval-or (rest statements) input rules)))
-    (values nil input)))
+          (eval-statement (first statements) input rules)
+        (format *standard-output* "eval or ret ~A ~A~%" result new-input)
+        (if result
+            (values result new-input)
+            (eval-or (rest statements) input rules)))
+      (values nil input)))
 
 (defun eval-call (expr input rules)
   (let ((op (first expr))
         (args (rest expr)))
     (format *standard-output* "eval call ~A ~A ~A ~A~%" expr (safe-elt input 0) op args)
     (cond
-     ((eq op 'quote) (eval-exact-match (first args) input))
-     ((eq op 'range) (eval-range (first args) (second args) input))
-     ((eq op 'or) (eval-or args input rules))
-     ((eq op '+) (eval-one-or-more args input rules))
-     ((eq op '*) (eval-one-or-more args input rules))
-     ((eq op '?) (eval-zero-or-one args input rules))
-     (t (error 'statement-error :statement expr))))
+      ((eq op 'quote) (eval-exact-match (first args) input))
+      ((eq op 'range) (eval-range (first args) (second args) input))
+      ((eq op 'or) (eval-or args input rules))
+      ((eq op '+) (eval-one-or-more args input rules))
+      ((eq op '*) (eval-one-or-more args input rules))
+      ((eq op '?) (eval-zero-or-one args input rules))
+      (t (error 'statement-error :statement expr))))
   )
 
 (defun find-rule (rule rules)
   (if (eq rule (first (first rules)))
       (first rules)
-    (find-rule rule (rest rules))))
+      (find-rule rule (rest rules))))
 
 (defun eval-statement (statement input rules)
   (cond
-   ((eq statement 'nil) (eval-match-eos input))
-   ((symbolp statement) (eval-rule (find-rule statement rules) input rules))
-   ((atom statement) (eval-exact-match statement input))
-   ((listp statement) (eval-call statement input rules))
-   (t (error 'statement-error :statement statement)))
+    ((eq statement 'nil) (eval-match-eos input))
+    ((symbolp statement) (eval-rule (find-rule statement rules) input rules))
+    ((atom statement) (eval-exact-match statement input))
+    ((listp statement) (eval-call statement input rules))
+    (t (error 'statement-error :statement statement)))
   )
 
 (defun action-arglist (n &optional acc)
   (if (listp n)
       (action-arglist (length n) acc)
-    (if (numberp n)
-        (if (>= n 0)
-            (action-arglist (- n 1) (cons (intern (format nil "$~A" n)) acc))
-          acc)
-      (action-arglist 1 acc))
-    ))
+      (if (numberp n)
+          (if (>= n 0)
+              (action-arglist (- n 1) (cons (intern (format nil "$~A" n)) acc))
+              acc)
+          (action-arglist 1 acc))
+      ))
 
 (defun eval-action (action acc)
   (if (atom acc)
       (eval-action action (list acc))
-    (progn
-      ;(setf acc (reverse acc))
-      (format *standard-output* "eval action ~A ~A~%" action acc)
-      (cond
-       ((symbolp action) (apply action (cons acc acc)))
-       ((listp action)
-        (let ((arglist (action-arglist acc)))
-          (apply (eval `(lambda ,arglist
-                          (declare (ignorable ,@arglist))
-                          ,action))
-                 (cons acc acc))))
-       (t (error 'statement-error :statement action))))
-    ))
+      (progn
+                                        ;(setf acc (reverse acc))
+        (format *standard-output* "eval action ~A ~A~%" action acc)
+        (cond
+          ((symbolp action) (apply action (cons acc acc)))
+          ((listp action)
+           (let ((arglist (action-arglist acc)))
+             (apply (eval `(lambda ,arglist
+                             (declare (ignorable ,@arglist))
+                             ,action))
+                    (cons acc acc))))
+          (t (error 'statement-error :statement action))))
+      ))
 
 (defun call-action-stack (action-stack &optional acc)
   (if action-stack
@@ -122,40 +122,40 @@
              (input (rest action)))
         (call-action-stack (rest action-stack) (cons (eval-action form (if (listp input)
                                                                            (reverse input)
-                                                                         input)) acc)))
-    acc))
-  
+                                                                           input)) acc)))
+      acc))
+
 (defun eval-statements (name statements input rules &optional acc action-stack)
   (format *standard-output* "eval ~A ~A~%" name statements)
   (let ((statement (first statements)))
     (cond
-     ((eq '> statement)
-      (eval-statements name
-                       (rest (rest statements))
-                       input
-                       rules
-                       (eval-action (first (rest statements)) (reverse acc))
-                       action-stack))
-     ((eq '@ statement)
-      (eval-statements name
-                       (rest (rest statements))
-                       input
-                       rules
-                       nil
-                       (cons (cons (first (rest statements)) acc) action-stack)))
-     ((eq statement nil)
-      (format *standard-output* "eval action-stack ~A~%" acc) ;; acc usused args?
-      (values (if action-stack
-                  (call-action-stack action-stack)
-                acc)
-              input))
-     (t
-      (multiple-value-bind (result new-input)
-                           (eval-statement statement input rules)
-                           (if result
-                               (eval-statements name (rest statements) new-input rules (cons result acc) action-stack)
-                             (values nil new-input))
-                           )))))
+      ((eq '> statement)
+       (eval-statements name
+                        (rest (rest statements))
+                        input
+                        rules
+                        (eval-action (first (rest statements)) (reverse acc))
+                        action-stack))
+      ((eq '@ statement)
+       (eval-statements name
+                        (rest (rest statements))
+                        input
+                        rules
+                        nil
+                        (cons (cons (first (rest statements)) acc) action-stack)))
+      ((eq statement nil)
+       (format *standard-output* "eval action-stack ~A~%" acc) ;; acc usused args?
+       (values (if action-stack
+                   (call-action-stack action-stack)
+                   acc)
+               input))
+      (t
+       (multiple-value-bind (result new-input)
+           (eval-statement statement input rules)
+         (if result
+             (eval-statements name (rest statements) new-input rules (cons result acc) action-stack)
+             (values nil new-input))
+         )))))
 
 (defun eval-rule (rule input rules)
   (eval-statements (first rule) (rest rule) input rules))
@@ -209,9 +209,9 @@
 (defun digit-list-to-number (lst &optional neg (n 0) (base 10))
   (if lst
       (digit-list-to-number (rest lst) neg (+ (* n base) (first lst)))
-    (if neg
-        (- n)
-      n)))
+      (if neg
+          (- n)
+          n)))
 
 (defun test-or (&optional (str "ababc12ac  ab  -13"))
   (setf *tokens* '())
@@ -222,8 +222,8 @@
                         (ab #\a #\b >(print-args 'on-ab $0 $1) @(push-token 'ab) @(print-args 'ab $0 $1))
                         (ac #\a #\c @(push-token 'ac) @(print-args 'ac $0 $1))
                         (number (? #\-)
-                                (+ (range #\0 #\9) >(digit-value $1))
-                                @(push-token (digit-list-to-number $2 (not (eq $1 T))))))))
+                         (+ (range #\0 #\9) >(digit-value $1))
+                         @(push-token (digit-list-to-number $2 (not (eq $1 T))))))))
     (values (eval-rules test-parser str)
             (reverse *tokens*))))
 

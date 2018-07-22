@@ -10,6 +10,6 @@
   (if (stringp feature)
       (setq feature (intern (string-upcase (if (eq (aref feature 0) #\:)
                                                (subseq feature 1)
-                                             feature))
+                                               feature))
                             "KEYWORD")))
   (not (eq nil (position feature features))))

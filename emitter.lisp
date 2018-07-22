@@ -64,7 +64,7 @@
   (format *standard-output* ";; Unbinding ~A slots~%" num)
   (if (> num 0)
       (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
-    env))
+      env))
 
 (defun emit-load-stack-value (asm-stack offset &optional (register 0))
   (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
@@ -113,19 +113,19 @@
   (let ((new-asm (emit-lookup-local asm-stack symbol env-start env)))
     (if new-asm
         new-asm
-      (emit-lookup-global asm-stack symbol toplevel-start toplevel))))
+        (emit-lookup-global asm-stack symbol toplevel-start toplevel))))
 
 (defun emit-lookup (asm-stack symbol env-start env toplevel-start toplevel)
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))
     (if new-asm
         new-asm
-      (error 'undefined-variable-error :name (symbol-string symbol)))))
+        (error 'undefined-variable-error :name (symbol-string symbol)))))
 
 (defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel-start toplevel)
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))
     (if new-asm
         new-asm
-      (emit-value asm-stack 'integer 0))))
+        (emit-value asm-stack 'integer 0))))
 
 (defun emit-push (asm-stack dest)
   (emit-op asm-stack :push dest))
@@ -135,7 +135,7 @@
   (if (> num-bindings 0)
       (emit-integer (emit-op asm-stack :inc 11)
                     (* num-bindings *REGISTER-SIZE*))
-    asm-stack))
+      asm-stack))
 
 (defun emit-stack-alloc (asm-stack size)
   (format *standard-output* ";; Allocating ~A bytes~%" size)

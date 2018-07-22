@@ -13,10 +13,10 @@
   (if (symbolp str)
       (if (keywordp str)
           (setf str (concatenate 'string ":" (symbol-name str)))
-        (setf str (symbol-name str))))
+          (setf str (symbol-name str))))
   (let* ((off (ptr-write-string str ending))
          (id (symbol-id ending start)))
     (if id
         (values id ending)
-      (values ending off))))
+        (values ending off))))
 

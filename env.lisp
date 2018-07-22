@@ -20,8 +20,8 @@
   (if (> env env-start)
       (if (eq (ptr-read-long (- env *REGISTER-SIZE*)) sym)
           n
-        (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
-    nil))
+          (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
+      nil))
 
 (defun env-data-position (sym env-start env)
   (let ((pos (env-symbol-position sym env-start env)))
@@ -35,4 +35,4 @@
   (let ((pos (env-symbol-position name env-start env)))
     (if pos
         env
-      (env-push-binding name env))))
+        (env-push-binding name env))))

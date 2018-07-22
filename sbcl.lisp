@@ -18,7 +18,7 @@
 (defun repl-source-path (mod-name)
   (make-pathname :name (if (symbolp mod-name)
                            (string-downcase (symbol-name mod-name))
-                         mod-name)
+                           mod-name)
                  :type "lisp"))
 
 (defun repl-module-loader (mod-name)
@@ -27,7 +27,7 @@
     (format *error-output* "Requiring ~A ~A~%" mod-name file-name)
     (if (load file-name)
         (provide mod-name)
-      (error 'repl-load-error :module mod-name :path file-name)))
+        (error 'repl-load-error :module mod-name :path file-name)))
   )
 
 (defun repl-load (&optional reload)
@@ -43,5 +43,5 @@
   (repl-load t))
 
 (eval-when (:load-toplevel :execute)
-           (repl-load))
+  (repl-load))
 
