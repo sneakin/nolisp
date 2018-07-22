@@ -54,7 +54,7 @@
         (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 11 stack-pos args tail-call)
         (if data-pos
             (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 9 data-pos args tail-call)
-            (error 'undefined-function :offset offset :name (symbol-string func-name))))))
+            (error 'undefined-function-error :offset offset :name (symbol-string func-name))))))
 
 ;; todo adjust stack offset in env with each push
 (defun compile-call-argument (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name arg tail-call)
@@ -389,20 +389,29 @@
   ))
 
 (defun compile-set-global (name start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
-  ;; if global, compile, and add or set the value
+  ;; compile the value
+  (format *standard-output* ";; setting global ~A ~A ~A ~A~%" (symbol-string name) name toplevel (env-data-position name toplevel-start toplevel))
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+      (repl-compile-inner start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+    (if kind (error 'malformed-error :offset start-offset :msg kind))
+    ;; eat the terminating )
+    (multiple-value-bind (kind value offset token-offset)
+        (read-token offset token-offset)
+      (if (and (eq kind 'special) (eq value (char-code #\))))
+          ;; find the position in the data segment
+          (let ((data-pos (env-data-position name toplevel-start toplevel)))
+            (if (not data-pos)
+                (error 'undefined-variable-error :offset start-offset :name (symbol-string  name)))
+            ;; emit the code to update the value
+            (values offset code-segment (emit-store-data-value asm-stack data-pos 0) token-offset env toplevel))
+          (error 'malformed-error :offset start-offset :msg "Terminator")))))
+
+
+(defun compile-define-global (name start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; get or define as a global, compile, and set the value
   (let ((toplevel (env-define name toplevel-start toplevel)))
-    (format *standard-output* ";; setting global ~A ~A ~A ~A~%" (symbol-string name) name toplevel (env-data-position name toplevel-start toplevel))
-    (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
-                         (repl-compile-inner start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
-                         (if kind (error 'malformed-error :offset start-offset :msg kind))
-                         ;; eat the terminating )
-                         (multiple-value-bind (kind value offset token-offset)
-                                              (read-token offset token-offset)
-                                              (if (and (eq kind 'special) (eq value (char-code #\))))
-                                                  (let ((data-pos (env-data-position name toplevel-start toplevel)))
-                                                    (values offset code-segment (emit-store-data-value asm-stack data-pos 0) token-offset env toplevel))
-                                                (error 'malformed-error :offset start-offset :msg "Terminator")))
-                         )))
+    (compile-set-global name start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
+
 
 (defun compile-set (offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; read symbol
@@ -413,6 +422,35 @@
                          (if stack-pos
                              (compile-set-local value stack-pos offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
                            (compile-set-global value offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))))
+
+;;; var
+(defun compile-var (offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; read symbol
+  (multiple-value-bind (kind value offset token-offset)
+      (read-token offset token-offset)
+    (if (not (eq kind 'symbol))
+        (error 'malformed-statement :offset offset))
+    (compile-define-global value offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
+
+;;; def
+
+(defun compile-def (start-offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; read the name, compile as an anonymous lambda, and set the binding's value
+  (multiple-value-bind (kind name offset token-offset)
+      (read-token start-offset token-offset)
+    (if (not (eq kind 'symbol))
+        (error 'malformed-error :offset start-offset))
+    (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env toplevel)
+        (compile-lambda offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start (env-define name toplevel-start toplevel))
+      (values offset code-segment
+              ;; lookup and set the value
+              (emit-store-data-value  new-asm-stack
+                                      (env-data-position name toplevel-start toplevel)
+                                      0)
+              new-token-offset
+              new-env
+              toplevel))))
+
 
 ;;; quote
 
@@ -663,6 +701,8 @@
         (string-equal sym "cond")
         (string-equal sym "let")
         (string-equal sym "set")
+        (string-equal sym "var")
+        (string-equal sym "def")
         (string-equal sym "quote")
         (string-equal sym "values")
         (string-equal sym "apply-values")
@@ -684,6 +724,10 @@
       (compile-let offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
      ((string-equal form-str "set")
       (compile-set offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "var")
+      (compile-var offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
+     ((string-equal form-str "def")
+      (compile-def offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
      ((string-equal form-str "quote")
       (compile-quote offset code-segment asm-stack token-offset env-start env toplevel-start toplevel))
      ((string-equal form-str "values")
