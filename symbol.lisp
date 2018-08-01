@@ -20,3 +20,13 @@
         (values id ending)
         (values ending off))))
 
+(defvar *symbol-gen-prefix* "gensym-")
+(defvar *symbol-next-token* 0)
+
+(defun symbol-gen (offset &optional (segment *TOKEN-SEGMENT*))
+  (multiple-value-bind (sym new-ending)
+      (symbol-intern (concatenate 'string *symbol-gen-prefix* (iota *symbol-next-token*))
+                     segment offset)
+    (incf *symbol-next-token* 1)
+    (values sym new-ending)))
+

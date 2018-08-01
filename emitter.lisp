@@ -55,17 +55,6 @@
       (emit-float (emit-op asm-stack :load 0 0 15) value)
       (emit-integer (emit-op asm-stack :load 0 0 15) value)))
 
-(defun env-push-binding (name env)
-  (format *standard-output* ";; Binding ~A~%" name)
-  (ptr-write-long name env)
-  (+ *REGISTER-SIZE* env))
-
-(defun env-pop-bindings (env num)
-  (format *standard-output* ";; Unbinding ~A slots~%" num)
-  (if (> num 0)
-      (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
-      env))
-
 (defun emit-load-stack-value (asm-stack offset &optional (register 0))
   (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
   )
@@ -127,8 +116,8 @@
         new-asm
         (emit-value asm-stack 'integer 0))))
 
-(defun emit-push (asm-stack dest)
-  (emit-op asm-stack :push dest))
+(defun emit-push (asm-stack src)
+  (emit-op asm-stack :push src))
 
 (defun emit-poppers (asm-stack num-bindings)
   (format *standard-output* ";; ~A poppers~%" num-bindings)

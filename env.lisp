@@ -5,6 +5,22 @@
 
 (in-package :repl)
 
+(defun env-push-binding (name env)
+  (format *standard-output*
+          ";; Binding ~A ~A~%"
+          (if (> name 0)
+              (ptr-read-string name)
+              name)
+          name)
+  (ptr-write-long name env)
+  (+ *REGISTER-SIZE* env))
+
+(defun env-pop-bindings (env num)
+  (format *standard-output* ";; Unbinding ~A slots~%" num)
+  (if (> num 0)
+      (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
+      env))
+
 (defun env-push-alloc (bytes env)
   (format *standard-output* ";; Binding ~A bytes~%" bytes)
   (+ env (align-bytes bytes) *REGISTER-SIZE*))
