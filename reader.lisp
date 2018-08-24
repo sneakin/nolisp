@@ -1,5 +1,7 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
+#+:sbcl
 (require "conditions")
+
 (require "memory")
 (require "null")
 (require "symbol")

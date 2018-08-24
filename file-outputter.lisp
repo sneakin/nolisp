@@ -22,7 +22,7 @@
       (repl-compile o-offset o-str-end o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
     (write-to-file path output o-code-segment code-segment o-asm-stack asm-stack o-token-offset token-offset env-start env o-toplevel toplevel)))
 
-(defun repl-file (path &optional (buffer-size (length *memory*)) (output-path (concatenate 'string path ".bin")))
+(defun repl-file (path &optional (buffer-size (ceiling (/ (length *memory*) 9))) (output-path (concatenate 'string path ".bin")))
   (let ((str-end (ptr-read-file path 0)))
     (compile-to-file output-path
                      (* buffer-size 6)

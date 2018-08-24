@@ -213,7 +213,7 @@
 
 (defun test-write (&optional (path "test.out"))
   (ptr-write-string "(set f (lambda (x) (if x (values 1 2 3 4) 255))) (f (f 123)) (f 0) (apply-values f (values 8 9))" 0)
-  (compile-to-file path 6000 0 1000 2000 3000 4000 4004 5000))
+  (compile-to-file path (concatenate 'string path ".bin") 6000 0 1000 2000 3000 4000 4004 5000))
 
 (defun test ()
   (test-read-token))
