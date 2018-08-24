@@ -116,8 +116,22 @@
         new-asm
         (emit-value asm-stack 'integer 0))))
 
+(defun emit-toplevel-store-reg (asm-stack name toplevel-start toplevel &optional (reg 0))
+  (emit-store-data-value  asm-stack
+                          (env-data-position name toplevel-start toplevel)
+                          reg))
+
+(defun emit-toplevel-store-value (asm-stack name kind value toplevel-start toplevel)
+  (emit-toplevel-store-reg (emit-value asm-stack kind value)
+                           name toplevel-start toplevel))
+
 (defun emit-push (asm-stack src)
   (emit-op asm-stack :push src))
+
+(defun emit-pushers (asm-stack n &optional (reg 0))
+  (if (< reg n)
+      (emit-pushers (emit-push asm-stack (+ 1 reg)) n (+ 1 reg))
+      asm-stack))
 
 (defun emit-poppers (asm-stack num-bindings)
   (format *standard-output* ";; ~A poppers~%" num-bindings)
