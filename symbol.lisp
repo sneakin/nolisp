@@ -9,16 +9,20 @@
   (if symbol-offset
       (ptr-read-string symbol-offset)))
 
-(defun symbol-intern (str start ending)
+(defun keyword? (sym)
+  (eq (ptr-read-byte sym)
+      (char-code #\:)))
+
+(defun symbol-intern (str segment-start segment-end)
   (if (symbolp str)
       (if (keywordp str)
           (setf str (concatenate 'string ":" (symbol-name str)))
           (setf str (symbol-name str))))
-  (let* ((off (ptr-write-string str ending))
-         (id (symbol-id ending start)))
+  (let* ((off (ptr-write-string str segment-end))
+         (id (symbol-id segment-end segment-start)))
     (if id
-        (values id ending)
-        (values ending off))))
+        (values id segment-end)
+        (values segment-end off))))
 
 (defvar *symbol-gen-prefix* "gensym-")
 (defvar *symbol-next-token* 0)

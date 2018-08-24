@@ -224,7 +224,7 @@
       ((and (eq kind 'special) (eq value initiator))
        (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
       ((and (eq kind 'special) (eq value terminator))
-       (if (<= depth 1)
+       (if (<= depth 0)
            (progn (format *standard-output* "  done~%")
                   offset) ; done
            (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up

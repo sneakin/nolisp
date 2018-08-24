@@ -211,8 +211,6 @@
                            :nop) 
                   reg data-offset))
 
-(defvar *INIT-FUNC* "__init")
-
 (defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
   (emit-op
    (emit-reg-call
