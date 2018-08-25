@@ -80,6 +80,7 @@
 (require "outputter")
 (require "file-outputter")
 (require "test")
+(require "disassembler")
 
 ;;;
 ;;; Compatibility layer functions

@@ -24,7 +24,7 @@
         (values id segment-end)
         (values segment-end off))))
 
-(defvar *symbol-gen-prefix* "gensym-")
+(defvar *symbol-gen-prefix* "-sym-")
 (defvar *symbol-next-token* 0)
 
 (defun symbol-gen (offset &optional (segment *TOKEN-SEGMENT*))

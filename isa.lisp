@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (in-package :repl)
 
 (require "type-sizes")
@@ -143,9 +145,9 @@
          (data-size (funcall data-fn op))
          (data-type (funcall data-type-fn op)))
     (if (> data-size 0)
-        (values (list op (read-op-data data-type seq (+ offset *SIZEOF_INST*)))
+        (values (list offset op (read-op-data data-type seq (+ offset *SIZEOF_INST*)))
                 (+ offset *SIZEOF_INST* data-size))
-        (values (list op) (+ offset *SIZEOF_INST*)))))
+        (values (list offset op) (+ offset *SIZEOF_INST*)))))
 
 (defun dis-repl-code (op-fn data-fn data-type-fn seq &optional (offset 0) acc)
   (if (< offset (length seq))

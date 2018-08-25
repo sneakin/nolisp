@@ -50,7 +50,7 @@
 
 (defun compile-funcall-resolve (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name args tail-call)
   (let ((stack-pos (env-stack-position func-name env-start env))
-        (data-pos (env-data-position func-name toplevel-start toplevel)))
+        (data-pos (env-function-position func-name args toplevel-start toplevel token-offset)))
     (if stack-pos
         (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 11 stack-pos args tail-call)
         (if data-pos
@@ -303,146 +303,36 @@
         (error 'malformed-let-error :offset start-offset))))
 
 
-;; Lambda
-
-(defun gen-func-name (func-name arity token-offset)
-  (symbol-intern (concatenate 'string (ptr-read-string func-name) "/" (iota arity))
-                 *TOKEN-SEGMENT* token-offset))
-
-(defun compile-lambda-optional-bindings (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-;;; when hitting &optional, define a function named 'name/arity' that points to the first
-;;; initializer, then the next optional argument gets a new function, 'name/arity+1'.
-  ;;; todo where to put the code to set the toplevel bindings?
-  ;;; onto the asm-stack, then move to the code-segment before the next binding?
-  (multiple-value-bind (name token-offset)
-      (gen-func-name func-name num token-offset)
-    (let ((toplevel (env-define name toplevel-start toplevel)))
-      (compile-lambda-optional-binding (+ 1 num)
-                                       start-offset
-                                       str-end
-                                       (emit-pushers code-segment num)
-                                       (emit-toplevel-store-value asm-stack name 'integer (- code-segment *code-segment*) toplevel-start toplevel)
-                                       token-offset env-start env toplevel-start toplevel func-name))
-  ))
-
-(defun emit-lambda-initializer (num code-segment asm-stack-start asm-stack-end)
-  (format *standard-output* ";; lambda init ~A~%" num)
-  (emit-push (ptr-copy asm-stack-start
-                     code-segment
-                     (- asm-stack-end asm-stack-start))
-             num))
-
-(defun emit-lambda-value-initializer (kind value num code-segment)
-  (format *standard-output* ";; lambda init value ~A: ~A ~A~%" num kind value)
-  (emit-push (emit-value code-segment kind value num) num))
-
-(defun compile-lambda-optional-binding-value (num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  (multiple-value-bind (kind name offset token-offset)
-      (read-token offset token-offset)
-    (if (not (eq kind 'symbol))
-        (error 'malformed-error :offset offset))
-    (compile-lambda-initializer name num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-    ))
-
-
-(defun compile-lambda-initializer (name num offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  (multiple-value-bind (func-name-arity token-offset)
-      (gen-func-name func-name num token-offset)
-    (let ((toplevel (env-define func-name-arity toplevel-start toplevel)))
-      (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
-          (repl-compile-inner offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
-        (multiple-value-bind (kind value offset token-offset)
-            (read-token offset token-offset)
-          (if (not (and (eq kind 'special)
-                        (eq value (char-code #\)))))
-              (error 'malformed-error :offset offset))
-          (let ((code-segment (emit-lambda-initializer num code-segment orig-asm-stack asm-stack)))
-            (compile-lambda-optional-binding (+ 1 num)
-                                             offset
-                                             str-end
-                                             code-segment
-                                             (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- code-segment *code-segment*) toplevel-start toplevel)
-                                             token-offset env-start
-                                             (env-push-binding name env)
-                                             toplevel-start
-                                             toplevel
-                                             func-name)))
-        ))))
-
-;; todo the initializers and toplevel setting may be mixing
-;; toplevel setting is unavailable while compiling a nested lambda keeping generated names from being bound
-;; 
-(defun compile-lambda-value-initializer (name kind value num offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  (multiple-value-bind (func-name-arity token-offset)
-      (gen-func-name func-name num token-offset)
-    (let ((toplevel (env-define func-name-arity toplevel-start toplevel))
-          (code-segment (emit-lambda-value-initializer kind value num code-segment)))
-      (compile-lambda-optional-binding (+ 1 num)
-                                       offset
-                                       str-end
-                                       code-segment
-                                       (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- code-segment *code-segment*) toplevel-start toplevel)
-                                       token-offset env-start
-                                       (env-push-binding name env)
-                                       toplevel-start
-                                       toplevel
-                                       func-name)
-      )))
-
-         
-
-(defun compile-lambda-optional-binding (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  ;; read token, determine symbol or list, and push symbols or list's head into env, compile list's tail and conditionally run before the body
-  (multiple-value-bind (kind value offset token-offset)
-      (read-token start-offset token-offset)
-    (cond
-      ((and (eq kind 'special)
-            (eq value (char-code #\()))
-       (compile-lambda-optional-binding-value num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
-      ((and (eq kind 'special)
-            (eq value (char-code #\))))
-       (compile-lambda-body (- num 1) offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
-      ((eq kind 'symbol)
-       (compile-lambda-value-initializer value 'integer 0 num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-       )
-      (t (error 'malformed-error :offset start-offset)))))
-
-
-(defun compile-lambda-rest-binding (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  ;; read symbol and push into env, then move to the body
-  (error 'not-implemented-error)
-  (multiple-value-bind (kind value offset token-offset)
-      (read-token start-offset token-offset)
-    ))
+;;;
+;;; Lambda
+;;; Lambdas are light weight functions. They can only have a fixed number of arguments and
+;;; may have a name for recursion.
+;;;
 
 (defun compile-lambda-body (num-bindings start-offset str-end orig-code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
-  (multiple-value-bind (func-name-arity token-offset)
-      (gen-func-name func-name num-bindings token-offset)
-    (let ((toplevel (env-define func-name-arity toplevel-start toplevel)))
-      (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
-        (compile-progn start-offset
-                       str-end
-                       orig-code-segment
-                       orig-asm-stack
-                       token-offset
-                       env-start
-                       env
-                       toplevel-start
-                       toplevel
-                       t)
-      (format *standard-output* ";; lambda closing ~A~%" (symbol-string func-name))
-      ;; (if func-name (setq num-bindings (+ 1 num-bindings)))
-      (let* ((asm-stack (emit-return (emit-poppers asm-stack num-bindings)))
-             ;; copy code from asm-stack to code-segment
-             (fn-code-segment (ptr-copy orig-asm-stack code-segment (- asm-stack orig-asm-stack))))
-        (format *standard-output* ";; Copied to code-segment ~A ~A ~A~%" orig-code-segment (- orig-code-segment *code-segment*)  (- asm-stack orig-asm-stack))
-        (values offset
-                fn-code-segment
-                ;; set toplevel binding
-                (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- code-segment *code-segment*) toplevel-start toplevel)
-                token-offset
-                (env-pop-bindings env num-bindings)
-                toplevel))))))
+  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+      (compile-progn start-offset
+                     str-end
+                     orig-code-segment
+                     (emit-pushers orig-asm-stack num-bindings)
+                     token-offset
+                     env-start
+                     env
+                     toplevel-start
+                     toplevel
+                     t)
+    (format *standard-output* ";; lambda closing ~A~%" (symbol-string func-name))
+    ;; (if func-name (setq num-bindings (+ 1 num-bindings)))
+    (let* ((asm-stack (emit-return (emit-poppers asm-stack num-bindings)))
+           ;; copy code from asm-stack to code-segment
+           (fn-code-segment (ptr-copy orig-asm-stack code-segment (- asm-stack orig-asm-stack))))
+      (format *standard-output* ";; Copied to code-segment ~A ~A ~A~%" orig-code-segment (- orig-code-segment *code-segment*)  (- asm-stack orig-asm-stack))
+      (values offset
+              fn-code-segment
+              orig-asm-stack
+              token-offset
+              (env-pop-bindings env num-bindings)
+              toplevel))))
 
 (defun compile-lambda-bindings (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
   ;; read symbols and push into env until &optional or &rest or )
@@ -451,9 +341,9 @@
       (read-token start-offset token-offset)
     (cond
       ((and (eq kind 'symbol) (string-equal (symbol-string value) "&optional"))
-       (compile-lambda-optional-bindings num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+       (error 'malformed-lambda-error :offset start-offset))
       ((and (eq kind 'symbol) (string-equal (symbol-string value) "&rest"))
-       (compile-lambda-rest-binding num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+       (error 'malformed-lambda-error :offset start-offset))
       ((eq kind 'symbol)
        (format *standard-output* ";;   ~A: ~A~%" num (symbol-string value))
        (compile-lambda-bindings (+ 1 num) offset str-end code-segment asm-stack token-offset env-start (env-push-binding value env) toplevel-start toplevel func-name))
@@ -508,9 +398,7 @@
                                  ((and (eq kind 'special) (eq value (char-code #\())) name)
                                  (t (error 'malformed-lambda-error :offset start-offset)))
                                env)
-                              toplevel-start toplevel name 1)
-      )  )
-)
+                              toplevel-start toplevel name 1))))
 
 ;; SET
 
@@ -525,8 +413,7 @@
         (read-token offset token-offset)
       (if (and (eq kind 'special) (eq value (char-code #\))))
           (values offset code-segment (emit-store-stack-value asm-stack stack-pos 0) token-offset env toplevel)
-          (error 'malformed-error :offset start-offset :msg "Terminator")))
-    ))
+          (error 'malformed-error :offset start-offset :msg "Terminator")))))
 
 (defun compile-set-global (name start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; compile the value
@@ -572,24 +459,189 @@
         (error 'malformed-statement :offset offset))
     (compile-define-global value offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
 
+;;;
 ;;; def
+;;; Toplevel functions that are like lambdas except they support optional arguments.
+;;;
+
+(defun gen-func-name (func-name arity token-offset)
+  (symbol-intern (concatenate 'string (ptr-read-string func-name) "/" (iota arity))
+                 *TOKEN-SEGMENT* token-offset))
+
+(defun emit-def-arg-initializer (num code-segment asm-stack-start asm-stack-end)
+  (format *standard-output* ";; def arg init ~A~%" num)
+  (ptr-copy asm-stack-start
+            code-segment
+            (- asm-stack-end asm-stack-start)))
+
+(defun emit-def-arg-default-initializer (kind value num code-segment)
+  (format *standard-output* ";; def arg init value ~A: ~A ~A~%" num kind value)
+  (emit-value code-segment kind value num))
+
+(defun compile-def-optional-binding-value (num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; reads the argument's name before moving to the initializer
+  (multiple-value-bind (kind name offset token-offset)
+      (read-token offset token-offset)
+    (if (not (eq kind 'symbol))
+        (error 'malformed-error :offset offset))
+    (compile-def-initializer name num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)))
+
+
+(defun compile-def-initializer (name num offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; compiles an argument's initializer and binds it to func-name/num
+  (multiple-value-bind (func-name-arity token-offset)
+      (gen-func-name func-name num token-offset)
+    (let ((toplevel (env-define func-name-arity toplevel-start toplevel)))
+      ;; compile the initiailizer
+      (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+          (repl-compile-inner offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
+        ;; eat the )
+        (multiple-value-bind (kind value offset token-offset)
+            (read-token offset token-offset)
+          (if (not (and (eq kind 'special)
+                        (eq value (char-code #\)))))
+              (error 'malformed-error :offset offset))
+          ;; copy compiled code to the code-segment
+          (let ((code-segment (emit-def-arg-initializer num code-segment orig-asm-stack asm-stack)))
+            ;; move to the next argument
+            (compile-def-optional-binding (+ 1 num)
+                                          offset
+                                          str-end
+                                          code-segment
+                                          ;; set the toplevel binding
+                                          (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- code-segment *code-segment*) toplevel-start toplevel)
+                                          token-offset env-start
+                                          ;; add argument to env
+                                          (env-push-binding name env)
+                                          toplevel-start
+                                          toplevel
+                                          func-name)))))))
+
+(defun compile-def-value-initializer (name kind value num offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; emits code to initialize an argument with the default value of 0 and moves to the
+  ;; next argument
+  (multiple-value-bind (func-name-arity token-offset)
+      (gen-func-name func-name num token-offset)
+    (let ((toplevel (env-define func-name-arity toplevel-start toplevel))
+          (code-segment (emit-def-arg-default-initializer kind value num code-segment)))
+      (compile-def-optional-binding (+ 1 num)
+                                    offset
+                                    str-end
+                                    code-segment
+                                    ;; set function's toplevel binding
+                                    (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- code-segment *code-segment*) toplevel-start toplevel)
+                                    token-offset env-start
+                                    ;; add argument to env
+                                    (env-push-binding name env)
+                                    toplevel-start
+                                    toplevel
+                                    func-name))))
+
+(defun compile-def-body (num-bindings start-offset str-end orig-code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; compiles a function's body binding it to func-name/num-bindings
+  (multiple-value-bind (func-name-arity token-offset)
+      (gen-func-name func-name num-bindings token-offset)
+    (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
+        (compile-lambda-body num-bindings
+                             start-offset
+                             str-end
+                             orig-code-segment
+                             orig-asm-stack
+                             token-offset
+                             env-start
+                             env
+                             toplevel-start
+                             (env-define func-name-arity toplevel-start toplevel)
+                             func-name)
+      (values offset
+              code-segment
+              ;; set toplevel binding
+              (emit-toplevel-store-value orig-asm-stack func-name-arity 'integer (- orig-code-segment *code-segment*) toplevel-start toplevel)
+              token-offset
+              (env-pop-bindings env num-bindings)
+              toplevel))))
+
+(defun compile-def-optional-binding (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; read token, determine symbol or list, and push symbols or list's head into env, compile list's tail and conditionally run before the body
+  (multiple-value-bind (kind value offset token-offset)
+      (read-token start-offset token-offset)
+    (cond
+      ;; argument with initializer
+      ((and (eq kind 'special)
+            (eq value (char-code #\()))
+       (compile-def-optional-binding-value num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; end of arglist
+      ((and (eq kind 'special)
+            (eq value (char-code #\))))
+       ;; don't need def-body to rebind fn/num
+       (compile-lambda-body (- num 1) offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; argument without an initializer
+      ((eq kind 'symbol)
+       (compile-def-value-initializer value 'integer 0 num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; or error
+      (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-def-optional-bindings (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; when hitting &optional, define a function named 'name/arity' that points to the first
+  ;; initializer, then the next optional argument gets a new function, 'name/arity+1'.
+  (multiple-value-bind (name token-offset)
+      (gen-func-name func-name num token-offset)
+    (let ((toplevel (env-define name toplevel-start toplevel)))
+      (compile-def-optional-binding (+ 1 num)
+                                    start-offset
+                                    str-end
+                                    code-segment
+                                    (emit-toplevel-store-value asm-stack name 'integer (- code-segment *code-segment*) toplevel-start toplevel)
+                                    token-offset env-start env toplevel-start toplevel func-name))))
+
+(defun compile-def-rest-binding (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; read symbol and push into env, then move to the body
+  (error 'not-implemented-error))
+
+(defun compile-def-bindings (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
+  ;; read symbols and push into env until &optional or &rest or )
+  (multiple-value-bind (kind value offset token-offset)
+      (read-token start-offset token-offset)
+    (cond
+      ;; optional arguments
+      ((and (eq kind 'symbol) (string-equal (symbol-string value) "&optional"))
+       (compile-def-optional-bindings num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; rest argument
+      ((and (eq kind 'symbol) (string-equal (symbol-string value) "&rest"))
+       (compile-def-rest-binding num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; argument
+      ((eq kind 'symbol)
+       (format *standard-output* ";;   ~A: ~A~%" num (symbol-string value))
+       (compile-def-bindings (+ 1 num) offset str-end code-segment asm-stack token-offset env-start (env-push-binding value env) toplevel-start toplevel func-name))
+      ;; end of arglist
+      ((and (eq kind 'special) (eq value (char-code #\))))
+       (compile-def-body num offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name))
+      ;; or error
+      (t (error 'malformed-lambda-error :offset start-offset)))))
+
+(defun compile-def-arglist (start-offset str-end orig-code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel name &optional (num-args 0))
+  ;; eat the arglist's leading parenthesis
+  (multiple-value-bind (kind value offset token-offset)
+      (read-token start-offset token-offset)
+    (cond
+      ;; start of the arglist
+      ((and (eq kind 'special) (eq value (char-code #\()))
+       (format *standard-output* ";; def ~A~%" (symbol-string name))
+       (compile-def-bindings num-args offset str-end orig-code-segment orig-asm-stack token-offset env env toplevel-start toplevel name))
+      ;; or error
+      (t (error 'malformed-lambda-error :offset start-offset)))))
 
 
 (defun compile-def (start-offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
-  ;; read the name, compile as an anonymous lambda, and set the binding's value
+  ;; read the name and compile like a lambda but with special handling for optional arguments
   (multiple-value-bind (kind name offset token-offset)
       (read-token start-offset token-offset)
     (if (not (eq kind 'symbol))
         (error 'malformed-error :offset start-offset))
     (multiple-value-bind (offset code-segment new-asm-stack new-token-offset new-env toplevel)
-        (compile-lambda-arglist offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start (env-define name toplevel-start toplevel) name)
+        (compile-def-arglist offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start (env-define name toplevel-start toplevel) name)
       (format *standard-output* ";; storing ~A~%" (ptr-read-string name))
-      (values offset code-segment
-              ;; lookup and set the value
-              (emit-toplevel-store-reg new-asm-stack name toplevel-start toplevel)
-              new-token-offset
-              new-env
-              toplevel))))
+      (values offset code-segment new-asm-stack new-token-offset new-env toplevel))))
 
 
 ;;; quote

@@ -1,5 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
-;;; Computes the factorial of 5 in about 279 cycles and 20 in 999 more cycles
+;;; Computes the factorial of 5 in about 284 cycles and 20 at 1304 cycles,
+;;; about 1024 more cycles
 
 (def - (a b)
      (asm (mov 0 1)

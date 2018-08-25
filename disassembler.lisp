@@ -1,4 +1,8 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (in-package :repl)
+
+(require "bacaw")
 
 (defun print-disassembly (sexp cs toplevel &optional (n 0))
   ;; function addresses are stored in DS which is unavailable until more data is stored about the toplevel
