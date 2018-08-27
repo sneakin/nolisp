@@ -108,7 +108,7 @@
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))
     (if new-asm
         new-asm
-        (error 'undefined-variable-error :name (symbol-string symbol)))))
+        (error 'undefined-variable-error :name symbol))))
 
 (defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel-start toplevel)
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))

@@ -3,6 +3,11 @@
 ;;; The compiler
 ;;;
 
+(in-package :repl)
+
+(defvar *TOKEN-SEGMENT* 0)
+(defvar *CODE-SEGMENT* 0)
+
 (require "conditions")
 (require "memory")
 (require "null")
@@ -16,9 +21,6 @@
 (require "env")
 
 (in-package :repl)
-
-(defvar *TOKEN-SEGMENT* 0)
-(defvar *CODE-SEGMENT* 0)
 
 ;;; funcall
 
@@ -55,7 +57,7 @@
         (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 11 stack-pos args tail-call)
         (if data-pos
             (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 9 data-pos args tail-call)
-            (error 'undefined-function-error :offset offset :name (symbol-string func-name))))))
+            (error 'undefined-function-error :offset offset :name func-name)))))
 
 ;; todo adjust stack offset in env with each push
 (defun compile-call-argument (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name arg tail-call)
@@ -76,8 +78,8 @@
 ;;; IF
 
 (defun compile-if-fixer (if-offset then-offset start-offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
-  (let ((offset-to-else (+ (- then-offset if-offset) *SIZEOF_LONG*))
-        (offset-to-end (- asm-stack then-offset)))
+  (let ((offset-to-else (- then-offset if-offset))
+        (offset-to-end (+ (- asm-stack then-offset *SIZEOF_LONG*))))
     (format *standard-output* ";; IF done ~A ~A ~A ~A ~A ~A~%" start-offset asm-stack if-offset then-offset offset-to-else offset-to-end)
     ;; correct the jump from the CMP to go to ELSE
     (ptr-write-long offset-to-else if-offset)
@@ -101,22 +103,30 @@
       (repl-compile-inner start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
     ;; no form, then done
     (if (and (eq kind 'special) (eq value (char-code #\))))
-        (compile-if-fixer if-offset nil offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+        (compile-if-fixer if-offset then-offset offset code-segment (emit-value asm-stack 'integer 0) token-offset env-start env toplevel-start toplevel)
         ;; almost done
         (if kind
             (error 'invalid-token-error :offset start-offset :kind kind :value value)
-            (compile-if-closing if-offset then-offset offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
-    ))
-;;;(error 'invalid-token-error :offset start-offset :kind kind :value value)
+            (compile-if-closing if-offset then-offset offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)))))
 
 (defun compile-if-then (if-offset start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
   ;; compile the THEN form
   (format *standard-output* ";; IF then~%")
   (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
       (repl-compile-inner start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
-    ;; no form, then done
-    (if (and (eq kind 'special) (eq kind (char-code #\))))
-        (compile-if-fixer if-offset nil offset code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+    ;; no form, emit zero, then done
+    (if (and (eq kind 'special) (eq value (char-code #\))))
+        (let ((asm-stack (emit-jump (emit-value asm-stack 'integer 0) #xFFFFFFFF)))
+          (compile-if-fixer if-offset
+                            (- asm-stack *SIZEOF_LONG*)
+                            offset
+                            code-segment
+                            (emit-value asm-stack 'integer 0)
+                            token-offset
+                            env-start
+                            env
+                            toplevel-start
+                            toplevel))
         ;; form so try ELSE
         (if kind
             (error 'invalid-token-error :offset start-offset :kind kind :value value)
@@ -165,15 +175,13 @@
         (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
             (compile-cond-case offset str-end code-segment body-end token-offset env-start env toplevel-start toplevel tail-call)
           (emit-fixed-jump body-end (- asm-stack body-end))
-          (values offset code-segment asm-stack token-offset env toplevel)
-          )))))
+          (values offset code-segment asm-stack token-offset env toplevel))))))
 
 (defun compile-cond-case-test (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
   (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel kind value)
       (repl-compile-inner start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
     (if kind (error 'invalid-token-error :offset start-offset :kind kind :value value))
-    (compile-cond-case-body offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
-    ))
+    (compile-cond-case-body offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)))
 
 (defun compile-cond-case (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
   (format *standard-output* ";; cond-case ~A~%" (ptr-read-string start-offset))
@@ -186,12 +194,10 @@
        (compile-cond-case-test offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
       ((and (eq kind 'special) (eq value (char-code #\))))
        (values offset code-segment asm-stack token-offset env toplevel))
-      (t (error 'malformed-error :offset start-offset))
-      )))
+      (t (error 'malformed-error :offset start-offset)))))
 
 (defun compile-cond (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
-  (compile-cond-case start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call)
-  )
+  (compile-cond-case start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
 
 ;;; progn
 
@@ -222,7 +228,6 @@
                                            (- asm-stack (or starting-asm-stack orig-asm-stack)))))
           (format *standard-output* ";;    code segment ~A ~A ~A ~A~%" o-code-segment code-segment *code-segment* (- code-segment *code-segment*))
           (values offset
-                  
                   new-code-segment
                   ;; emit the address for toplevel's initializer
                   (emit-value (or starting-asm-stack orig-asm-stack) 'integer (- code-segment *code-segment*))
@@ -243,8 +248,7 @@
             (emit-poppers asm-stack num-bindings)
             token-offset
             (env-pop-bindings env num-bindings)
-            toplevel)
-    ))
+            toplevel)))
 
 (defun compile-let-binding-initializer (num name start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (format *standard-output* ";;  ~A: ~A init~%" num (symbol-string name))
@@ -428,7 +432,7 @@
           ;; find the position in the data segment
           (let ((data-pos (env-data-position name toplevel-start toplevel)))
             (if (not data-pos)
-                (error 'undefined-variable-error :offset start-offset :name (symbol-string  name)))
+                (error 'undefined-variable-error :offset start-offset :name name))
             ;; emit the code to update the value
             (values offset code-segment (emit-store-data-value asm-stack data-pos 0) token-offset env toplevel))
           (error 'malformed-error :offset start-offset :msg "Terminator")))))
@@ -861,14 +865,21 @@
 ;;; Require
 
 (defvar *load-path* ".")
+(defvar *load-extensions* '(".nl" ".lisp"))
 
-(defun resolve-load-path (path)
-  (ptr-read-string path))
+(defun resolve-load-path (path &optional (extensions *load-extensions*))
+  (let ((p1 (concatenate 'string (ptr-read-string path) (first extensions))))
+    (if (probe-file p1)
+        p1
+        (if extensions
+            (resolve-load-path path (rest extensions))
+            (error 'no-file-error :path path)))))
+
 
 (defun compile-require-it (path start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (format *standard-output* ";; Require ~A~%" (ptr-read-string path))
   (multiple-value-bind (req-offset code-segment asm-stack token-offset env toplevel kind value)
-      (repl-compile-file (resolve-load-path path) str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+      (repl-compile-file (resolve-load-path path) str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel t)
     (format *standard-output* ";; ~A required~%" (ptr-read-string path))
     (values start-offset code-segment asm-stack token-offset env toplevel)))
 
@@ -892,7 +903,9 @@
     (or (string-equal sym "if")
         (string-equal sym "cond")
         (string-equal sym "let")
+        (string-equal sym "let*")
         (string-equal sym "set")
+        (string-equal sym "setq")
         (string-equal sym "var")
         (string-equal sym "defvar")
         (string-equal sym "def")
@@ -914,9 +927,9 @@
        (compile-if offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
       ((string-equal form-str "cond")
        (compile-cond offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
-      ((string-equal form-str "let")
+      ((or (string-equal form-str "let") (string-equal form-str "let*"))
        (compile-let offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
-      ((string-equal form-str "set")
+      ((or (string-equal form-str "set") (string-equal form-str "setq"))
        (compile-set offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
       ((or (string-equal form-str "var") (string-equal form-str "defvar"))
        (compile-var offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
@@ -1064,12 +1077,12 @@
       ))
   )
 
-(defun repl-compile (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
-  (setf *TOKEN-SEGMENT* token-offset)
-  (setf *CODE-SEGMENT* code-segment)
-  (compile-toplevel str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
-  )
+(defun repl-compile (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional in-require)
+  (unless in-require
+    (setq *TOKEN-SEGMENT* token-offset)
+    (setq *CODE-SEGMENT* code-segment))
+  (compile-toplevel str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
 
-(defun repl-compile-file (path str code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+(defun repl-compile-file (path str code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional in-require)
   (let ((str-end (ptr-read-file path str)))
-    (repl-compile str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))
+    (repl-compile str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel in-require)))

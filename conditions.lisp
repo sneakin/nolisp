@@ -18,17 +18,6 @@
              (format stream "Unknown op error: ~A ~A~%" (slot-value condition 'op) (type-of (slot-value condition 'op))))))
 
 #+:sbcl
-(define-condition undefined-variable-error (repl-error)
-  ((variable :initarg :variable :initform nil)
-   (offset :initarg :offset :initform nil))
-  (:report (lambda (condition stream)
-             (format stream
-                     "Undefined symbol at ~A: ~A ~A~%"
-                     (slot-value condition 'offset)
-                     (symbol-string (slot-value condition 'variable))
-                     (slot-value condition 'variable)))))
-
-#+:sbcl
 (define-condition not-implemented-error (repl-error)
   ((feature :initarg :feature :initform nil))
   (:report (lambda (condition stream)
@@ -62,10 +51,11 @@
   ((kind :initarg :kind :initform nil)
    (value :initarg :value :initform nil))
   (:report (lambda (condition stream)
-             (format stream "Invalid ~A token at ~A: ~A~%~A~%"
+             (format stream "Invalid ~A token at ~A: ~A ~A~%~A~%"
                      (slot-value condition 'kind)
                      (slot-value condition 'offset)
                      (slot-value condition 'value)
+                     (code-char (slot-value condition 'value))
                      (ptr-read-string (slot-value condition 'offset))))))
 
 #+:sbcl
@@ -86,9 +76,14 @@
 
 #+:sbcl
 (define-condition undefined-error (repl-error)
-  ((name :initarg :name :initform nil))
+  ((name :initarg :name :initform nil)
+   (offset :initarg :offset :initform nil))
   (:report (lambda (condition stream)
-             (format stream "Undefined variable ~A~%"
+             (format stream
+                     "~A at ~A: ~A ~A~%"
+                     (type-of condition)
+                     (slot-value condition 'offset)
+                     (symbol-string (slot-value condition 'name))
                      (slot-value condition 'name)))))
 
 #+:sbcl
@@ -101,3 +96,9 @@
   ((number :initarg :number :initform nil))
   (:report (lambda (condition stream)
              (format stream "Too many arguments: ~A~%" (slot-value condition 'number)))))
+
+#+:sbcl
+(define-condition no-file-error (repl-error)
+  ((path :initarg :path :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "File does not exist: ~A~%" (ptr-read-string (slot-value condition 'path))))))

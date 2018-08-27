@@ -8,23 +8,85 @@
 
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
+#+:sbcl
 (defvar *MEMORY* (make-array (* 256 1024) :element-type '(unsigned-byte 8)))
+#+:repl
+(defvar *MEMORY* 0)
 
+#+:sbcl
 (defun ptr-read-byte (ptr)
   (aref *MEMORY* ptr))
 
+#+:repl
+(defun ptr-read-byte (ptr)
+  (asm (mov 0 1)
+       (cls)
+       (addi 2 0 14)
+       (load 0 0 0)
+       0))
+
+#+:sbcl
 (defun ptr-write-byte (c ptr)
   (setf (aref *MEMORY* ptr) c)
   (+ ptr 1))
 
+#+:repl
+(defun ptr-write-byte (c ptr)
+  (asm (store 1 0 0)
+       0))
+
+#+:sbcl
 (defun ptr-read-array (ptr elements &optional (arr (make-array elements :element-type '(unsigned-byte 8))))
   (dotimes (n elements)
     (setf (aref arr n) (ptr-read-byte (+ ptr n))))
   arr)
 
+#+:sbcl
 (defun ptr-write-array (ptr array)
   (dotimes (n (length array))
     (ptr-write-byte (aref array n) (+ ptr n))))
+
+(defun ptr-read-short (ptr)
+  (logior (ptr-read-byte ptr)
+          (ash (ptr-read-byte (+ ptr 1)) 8)))
+
+#+:sbcl
+(defun mask-ulong (byte n)
+  (ldb (byte 8 (* 8 byte)) n))
+
+#+:repl
+(defun mask-ulong (byte n)
+  (logand n (ash #xFF byte)))
+
+(defun ptr-write-short (n ptr)
+  (ptr-write-byte (mask-ulong 0 n) ptr)
+  (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
+
+(defun ptr-read-long (ptr)
+  (logior (ptr-read-byte ptr)
+          (ash (ptr-read-byte (+ ptr 1)) 8)
+          (ash (ptr-read-byte (+ ptr 2)) 16)
+          (ash (ptr-read-byte (+ ptr 3)) 24)))
+
+(defun ptr-write-long (n ptr)
+  (if (eq n nil) (setf n 0))
+  (ptr-write-byte (mask-ulong 0 n) ptr)
+  (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr))
+  (ptr-write-byte (mask-ulong 2 n) (+ 2 ptr))
+  (ptr-write-byte (mask-ulong 3 n) (+ 3 ptr))
+  )
+
+#+:sbcl
+(defun ptr-write-string (str ptr)
+  (dotimes (n (length str))
+    (ptr-write-byte (char-code (aref str n)) (+ n ptr)))
+  (ptr-write-byte 0 (+ (length str) ptr)))
+
+#+:repl
+(defun ptr-write-string (str ptr)
+  (if (eq (ptr-read-byte str) 0)
+      (ptr-write-byte 0 ptr)
+      (ptr-write-string (+ str 1) (ptr-write-byte 0 ptr))))
 
 (defun ptr-copy (src dest count)
   (if (> count *SIZEOF_LONG*)
@@ -37,32 +99,6 @@
             (ptr-copy (+ src 1) (+ dest 1) (- count 1)))
           dest)))
 
-(defun ptr-read-short (ptr)
-  (logior (ptr-read-byte ptr)
-          (ash (ptr-read-byte (+ ptr 1)) 8)))
-
-(defun ptr-write-short (n ptr)
-  (ptr-write-byte (ldb (byte 8 0) n) ptr)
-  (ptr-write-byte (ldb (byte 8 8) n) (+ 1 ptr)))
-
-(defun ptr-read-long (ptr)
-  (logior (ptr-read-byte ptr)
-          (ash (ptr-read-byte (+ ptr 1)) 8)
-          (ash (ptr-read-byte (+ ptr 2)) 16)
-          (ash (ptr-read-byte (+ ptr 3)) 24)))
-
-(defun ptr-write-long (n ptr)
-  (if (eq n nil) (setf n 0))
-  (ptr-write-byte (ldb (byte 8 0) n) ptr)
-  (ptr-write-byte (ldb (byte 8 8) n) (+ 1 ptr))
-  (ptr-write-byte (ldb (byte 8 16) n) (+ 2 ptr))
-  (ptr-write-byte (ldb (byte 8 24) n) (+ 3 ptr))
-  )
-
-(defun ptr-write-string (str ptr)
-  (dotimes (n (length str))
-    (ptr-write-byte (char-code (aref str n)) (+ n ptr)))
-  (ptr-write-byte 0 (+ (length str) ptr)))
 
 #+:sbcl
 (defun ptr-read-string (ptr &optional count acc (n 0))
@@ -72,6 +108,14 @@
         (progn
           (setf acc (concatenate 'string acc (list (code-char c))))
           (ptr-read-string (+ 1 ptr) count acc (+ 1 n))))))
+
+#+:repl
+(defun ptr-read-string (ptr &optional count acc (n 0))
+  (let* ((c (ptr-read-byte ptr)))
+    (if (or (and count (>= n count)) (null? c))
+        acc
+        (progn
+          (ptr-read-string (+ 1 ptr) count (ptr-write-byte c acc) (+ 1 n))))))
 
 #+:sbcl
 (defun ptr-read-float (ptr)
@@ -98,6 +142,7 @@
                 stack-start
                 (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
 
+#+:sbcl
 (defun ptr-read-file (path offset)
   (with-open-file (f path
                      :direction :input
