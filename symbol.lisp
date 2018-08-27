@@ -13,6 +13,13 @@
   (eq (ptr-read-byte sym)
       (char-code #\:)))
 
+(defun symbol-has-arity? (sym)
+  (if (eq (ptr-read-byte sym) (char-code #\/))
+      t
+      (if (eq (ptr-read-byte sym) 0)
+          nil
+          (symbol-has-arity? (+ sym 1)))))
+
 (defun symbol-intern (str segment-start segment-end)
   (if (symbolp str)
       (if (keywordp str)

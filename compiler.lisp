@@ -41,14 +41,15 @@
             post-env
             toplevel)))
 
+;; todo calls need to check if # args matches the arity
+
 (defun compile-funcall-it (str code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name reg data-offset args tail-call)
   (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
   (if tail-call
       (compile-funcall-tail str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)
       (compile-funcall-push str code-segment asm-stack token-offset env-start env toplevel-start toplevel reg data-offset args)))
 
-;; todo call to an explicit arity needs to check if # args matches, not mangle symbol
-;; lambda needs to define symbols while going through arg list
+;; todo raise an error when an explicit function arity does not match number of arguments
 
 (defun compile-funcall-resolve (offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name args tail-call)
   (let ((stack-pos (env-stack-position func-name env-start env))
@@ -59,7 +60,6 @@
             (compile-funcall-it offset code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name 9 data-pos args tail-call)
             (error 'undefined-function-error :offset offset :name func-name)))))
 
-;; todo adjust stack offset in env with each push
 (defun compile-call-argument (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name arg tail-call)
   ;; until an #\) is read
   ;;   call each argument
@@ -340,7 +340,6 @@
 
 (defun compile-lambda-bindings (num start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel func-name)
   ;; read symbols and push into env until &optional or &rest or )
-  ;; todo shift env-start?
   (multiple-value-bind (kind value offset token-offset)
       (read-token start-offset token-offset)
     (cond
@@ -378,7 +377,6 @@
 
 (defun compile-lambda (start-offset str-end code-segment orig-asm-stack token-offset env-start env toplevel-start toplevel)
   ;; lambdas generate a symbol to name a new function.
-  ;; todo the value on the stack, and any function pointer is to the /any arity function. That takes an explicit argument number when called.
   ;; generate a toplevel name
   (multiple-value-bind (name token-offset)
       (symbol-gen token-offset)
@@ -740,7 +738,7 @@
   (format *standard-output* ";; Apply-Values~%")
   (values offset code-segment (emit-poppers (emit-call asm-stack 11 0) 1) token-offset env toplevel))
 
-;; todo refactor: funcall should be equivalent to (apply-values func (values args...))
+;; possible refactor: funcall should be equivalent to (apply-values func (values args...))
 (defun compile-apply-values (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   ;; apply-values func expr
   ;; Calls func passing any values return with VALUES as argument values.
