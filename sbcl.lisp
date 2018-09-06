@@ -15,14 +15,25 @@
                      (slot-value condition 'module)
                      (slot-value condition 'path)))))
 
-(defun repl-source-path (mod-name)
+(defun repl-source-path (mod-name &optional (ext "lisp"))
   (make-pathname :name (if (symbolp mod-name)
                            (string-downcase (symbol-name mod-name))
                            mod-name)
-                 :type "lisp"))
+                 :type ext))
+
+(defconstant *repl-extensions* '("lisp" "nl"))
+
+(defun repl-resolve-path (mod-name &optional (extensions *repl-extensions*))
+  (if extensions
+      (let ((file-name (repl-source-path mod-name (first extensions))))
+        (if (probe-file file-name)
+            file-name
+            (repl-resolve-path mod-name (rest extensions))))
+      nil))
+
 
 (defun repl-module-loader (mod-name)
-  (let* ((file-name (repl-source-path mod-name)))
+  (let* ((file-name (repl-resolve-path mod-name)))
     (unless file-name (error 'repl-module-not-found-error :module mod-name :path file-name))
     (format *error-output* "Requiring ~A ~A~%" mod-name file-name)
     (if (load file-name)

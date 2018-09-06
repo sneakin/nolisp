@@ -11,10 +11,14 @@
         (if (eq (aref a as) (aref b bs))
             (string= a b (+ 1 as) (+ 1 bs))))))
 
-#+sbcl
-(defun iota (n &optional (base 10))
+#+:sbcl
+(defun itoa (n &optional (base 10))
   (let ((old-base *print-base*))
-    (setf *print-base* base)
+    (setq *print-base* base)
     (let ((str (format nil "~A" n)))
-      (setf *print-base* old-base)
+      (setq *print-base* old-base)
       str)))
+
+#+:sbcl
+(defun string-aref (str n)
+  (aref str n))

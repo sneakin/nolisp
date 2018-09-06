@@ -1,4 +1,4 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(require "runtime")
-(require "reader")
+(def numberp (obj)
+     t)

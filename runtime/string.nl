@@ -5,6 +5,9 @@
       n
       (length (+ str 1) (+ n 1))))
 
+(defun string-aref (str n)
+  (ptr-read-byte (+ str n)))
+
 (defun string-equal (a b)
   (let* ((ac (ptr-read-byte a))
          (bc (ptr-read-byte b)))
@@ -18,6 +21,9 @@
       (t nil))
     )
   )
+
+(defun code-char (char)
+  char)
 
 (defun char-code (code)
   code)

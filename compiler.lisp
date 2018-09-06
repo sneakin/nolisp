@@ -5,15 +5,16 @@
 
 (in-package :repl)
 
-(defvar *TOKEN-SEGMENT* 0)
 (defvar *CODE-SEGMENT* 0)
 
 (require "conditions")
 (require "memory")
 (require "null")
-(require "symbol")
 (require "sequence")
+(require "symbol")
 (require "string")
+(require "symbol-gen")
+(require "compiler/state")
 (require "reader")
 (require "type-sizes")
 (require "features")
@@ -21,6 +22,9 @@
 (require "env")
 
 (in-package :repl)
+
+(compiler-global-init)
+
 
 ;;; funcall
 
@@ -467,8 +471,8 @@
 ;;;
 
 (defun gen-func-name (func-name arity token-offset)
-  (symbol-intern (concatenate 'string (ptr-read-string func-name) "/" (iota arity))
-                 *TOKEN-SEGMENT* token-offset))
+  (symbol-intern (concatenate 'string (ptr-read-string func-name) "/" (itoa arity))
+                 (compiler-token-segment-data *COMPILER*) token-offset))
 
 (defun emit-def-arg-initializer (num code-segment asm-stack-start asm-stack-end)
   (format *standard-output* ";; def arg init ~A~%" num)
@@ -881,6 +885,8 @@
     (format *standard-output* ";; ~A required~%" (ptr-read-string path))
     (values start-offset code-segment asm-stack token-offset env toplevel)))
 
+;;; todo only require files once
+
 (defun compile-require (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
   (multiple-value-bind (kind path offset token-offset)
       (read-token start-offset token-offset)
@@ -892,6 +898,15 @@
                     (eq value (char-code #\)))))
           (error 'malformed-error :offset start-offset)
           (compile-require-it path offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)))))
+
+;;; defmacro
+
+(defun compile-defmacro (start-offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel)
+  ;; like a function but gets called during compile time, compiles the returned expression,
+  ;; and places the resulting expression
+  ;; at the call site.
+  ;; kind of handles inlined functions
+  )
 
 
 ;;; Special forms
@@ -906,6 +921,7 @@
         (string-equal sym "setq")
         (string-equal sym "var")
         (string-equal sym "defvar")
+        (string-equal sym "defconstant")
         (string-equal sym "def")
         (string-equal sym "defun")
         (string-equal sym "quote")
@@ -929,7 +945,7 @@
        (compile-let offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel tail-call))
       ((or (string-equal form-str "set") (string-equal form-str "setq"))
        (compile-set offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
-      ((or (string-equal form-str "var") (string-equal form-str "defvar"))
+      ((or (string-equal form-str "var") (string-equal form-str "defvar") (string-equal form-str "defconstant"))
        (compile-var offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
       ((or (string-equal form-str "def") (string-equal form-str "defun"))
        (compile-def offset str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
@@ -1077,7 +1093,7 @@
 
 (defun repl-compile (str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel &optional in-require)
   (unless in-require
-    (setq *TOKEN-SEGMENT* token-offset)
+    (set-compiler-token-segment-data *COMPILER* token-offset)
     (setq *CODE-SEGMENT* code-segment))
   (compile-toplevel str str-end code-segment asm-stack token-offset env-start env toplevel-start toplevel))
 

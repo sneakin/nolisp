@@ -55,16 +55,18 @@
                      (slot-value condition 'kind)
                      (slot-value condition 'offset)
                      (slot-value condition 'value)
-                     (code-char (slot-value condition 'value))
-                     (ptr-read-string (slot-value condition 'offset))))))
+                     (slot-value condition 'value)
+                     (if (slot-value condition 'offset)
+                         (ptr-read-string (slot-value condition 'offset)))))))
 
 #+:sbcl
 (define-condition invalid-escape-error (malformed-error)
   ((char :initarg :char :initform nil))
   (:report (lambda (condition stream)
-             (format stream "Invalid character escape ~A: ~A~%"
+             (format stream "Invalid character escape ~A: ~A ~A~%"
                      (slot-value condition 'offset)
-                     (slot-value condition 'char)))))
+                     (slot-value condition 'char)
+                     (code-char (slot-value condition 'char))))))
 
 #+:sbcl
 (define-condition invalid-character-error (malformed-error)

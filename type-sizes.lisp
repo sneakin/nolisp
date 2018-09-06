@@ -3,7 +3,7 @@
 #+:sbcl
 (in-package :repl)
 
-(defvar *SIZEOF_BYTE* 2)
+(defvar *SIZEOF_BYTE* 1)
 (defvar *SIZEOF_SHORT* 2)
 (defvar *SIZEOF_USHORT* 2)
 (defvar *SIZEOF_LONG* 4)
@@ -16,6 +16,15 @@
   ((type :initarg :type))
   (:report (lambda (condition stream)
              (format stream "Unknown data type: ~A~%" (slot-value condition 'type)))))
+
+(defun type-atom? (type)
+  (or (eq type :byte)
+      (eq type :short)
+      (eq type :long)
+      (eq type :float)
+      (eq type :ubyte)
+      (eq type :ushort)
+      (eq type :ulong)))
 
 (defun type-size (type)
   (cond

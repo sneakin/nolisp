@@ -3,6 +3,8 @@
 
 (require "null")
 (require "type-sizes")
+#+:repl
+(require "runtime/memory")
 
 (in-package :repl)
 
@@ -13,27 +15,16 @@
 #+:repl
 (defvar *MEMORY* 0)
 
+#+:repl (require "runtime/memory")
+
 #+:sbcl
 (defun ptr-read-byte (ptr)
   (aref *MEMORY* ptr))
-
-#+:repl
-(defun ptr-read-byte (ptr)
-  (asm (mov 0 1)
-       (cls)
-       (addi 2 0 14)
-       (load 0 0 0)
-       0))
 
 #+:sbcl
 (defun ptr-write-byte (c ptr)
   (setf (aref *MEMORY* ptr) c)
   (+ ptr 1))
-
-#+:repl
-(defun ptr-write-byte (c ptr)
-  (asm (store 1 0 0)
-       0))
 
 #+:sbcl
 (defun ptr-read-array (ptr elements &optional (arr (make-array elements :element-type '(unsigned-byte 8))))
@@ -62,12 +53,14 @@
   (ptr-write-byte (mask-ulong 0 n) ptr)
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
 
+#+:sbcl
 (defun ptr-read-long (ptr)
   (logior (ptr-read-byte ptr)
           (ash (ptr-read-byte (+ ptr 1)) 8)
           (ash (ptr-read-byte (+ ptr 2)) 16)
           (ash (ptr-read-byte (+ ptr 3)) 24)))
 
+#+:sbcl
 (defun ptr-write-long (n ptr)
   (if (eq n nil) (setf n 0))
   (ptr-write-byte (mask-ulong 0 n) ptr)
@@ -83,10 +76,10 @@
   (ptr-write-byte 0 (+ (length str) ptr)))
 
 #+:repl
-(defun ptr-write-string (str ptr)
-  (if (eq (ptr-read-byte str) 0)
-      (ptr-write-byte 0 ptr)
-      (ptr-write-string (+ str 1) (ptr-write-byte 0 ptr))))
+(defun string-length (str &optional (n 0))
+  (if (null? (ptr-read-byte str))
+      n
+      (string-length (+ str 1) (+ n 1))))
 
 (defun ptr-copy (src dest count)
   (if (> count *SIZEOF_LONG*)
@@ -98,6 +91,10 @@
             (ptr-write-byte (ptr-read-byte src) dest)
             (ptr-copy (+ src 1) (+ dest 1) (- count 1)))
           dest)))
+
+#+:repl
+(defun ptr-write-string (str ptr)
+  (ptr-copy str ptr (string-length ptr)))
 
 
 #+:sbcl
@@ -181,3 +178,21 @@
 (defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
   (* (ceiling (/ bytes alignment)) alignment))
 
+#+:sbcl
+(defvar *allocate-next-offset* (- (length *MEMORY*) 1))
+
+#+:sbcl
+(defun allocate (bytes)
+  (setq *allocate-next-offset* (- *allocate-next-offset* bytes))
+  *allocate-next-offset*)
+
+#+:sbcl
+(defun unallocate (bytes)
+  (setq *allocate-next-offset* (+ *allocate-next-offset* bytes))
+  *allocate-next-offset*)
+
+#+:sbcl
+(defmacro with-allocation (binding bytes &rest body)
+  `(let ((,binding (allocate ,bytes)))
+       ,@body
+       (unallocate ,bytes)))

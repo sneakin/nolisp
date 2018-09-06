@@ -7,3 +7,6 @@
   (if a
       (if b b nil)
       nil))
+
+(defun not (a)
+  (if a a nil))

@@ -9,14 +9,23 @@
 
 (in-package :repl)
 
+#+:repl
+(defvar *standard-output* 0)
+#+:repl
+(defun format (stream str &optional a b c d)
+  nil)
+
 ;;; Base of the read numbers
 (defvar *NUMBER-BASE* 10)
-(defvar *SYMBOL-SPECIALS* ".,:-~!@$%^&*_=+\/?<>|#")
+(defvar *SYMBOL-SPECIALS* ".,:-~!@$%^&*_=+\\/?<>|#")
 (defvar *LIST-INITIATORS* "([{")
 (defvar *LIST-TERMINATORS* ")]}")
 (defvar *SPECIALS* "()[]\"'`")
 #+:sbcl
 (defvar *SPACES* (format nil "~c~c~c~c" #\space #\newline #\tab #\return))
+#+:repl
+(defvar *SPACES* " 	
+")
 
 (defun symbol-special? (c)
   (not (eq nil (index-of c *SYMBOL-SPECIALS*))))
@@ -28,13 +37,13 @@
   (not (eq nil (index-of c *LIST-INITIATORS*))))
 
 (defun list-initiator-for (c)
-  (aref *LIST-INITIATORS* (index-of c *LIST-TERMINATORS*)))
+  (string-aref *LIST-INITIATORS* (index-of c *LIST-TERMINATORS*)))
 
 (defun list-terminator? (c)
   (not (eq nil (index-of c *LIST-TERMINATORS*))))
 
 (defun list-terminator-for (c)
-  (aref *LIST-TERMINATORS* (index-of c *LIST-INITIATORS*)))
+  (string-aref *LIST-TERMINATORS* (index-of c *LIST-INITIATORS*)))
 
 (defun newline? (c)
   (or (eq c (char-code #\newline)) (eq c (char-code #\return))))
@@ -127,15 +136,16 @@
 
 (defun unescape-char (c)
   (cond
-    ((eq c (char-code #\")) c)
-    ((eq c (char-code #\')) c)
+    ((eq c (char-code #\")) #\")
+    ((eq c (char-code #\')) #\')
     ((eq c (char-code #\n)) #\newline)
     ((eq c (char-code #\r)) #\return)
     ((eq c (char-code #\t)) #\tab)
     ((eq c (char-code #\\)) #\\)
+    ((eq c (char-code #\/)) #\/)
     (t (error 'invalid-escape-error :char c))))
 
-(defun read-string (str output &optional (terminator (char-code #\")) output-start)
+(defun read-string (str output &optional (terminator #\") output-start)
   (let ((c (ptr-read-byte str))
         (terminator (if (numberp terminator)
                         terminator
@@ -145,13 +155,14 @@
        (ptr-write-byte 0 output)
        (values 'string output-start (+ 1 str) (+ 1 output)))
       ((eq c (char-code #\\))
-       (ptr-write-byte (unescape-char (ptr-read-byte (+ 1 str))) output)
+       (ptr-write-byte (char-code (unescape-char (ptr-read-byte (+ 1 str)))) output)
        (read-string (+ str 2) (+ output 1) terminator (or output-start output)))
       (t
        (ptr-write-byte c output)
        (read-string (+ str 1) (+ output 1) terminator (or output-start output))))))
 
 (defun character-by-name (char-sym)
+  (format *standard-output* "Char by name ~A~%" char-sym)
   (cond
     ((string-equal char-sym "space") #\space)
     ((string-equal char-sym "newline") #\newline)
@@ -161,29 +172,33 @@
     ((string-equal char-sym "backspace") #\backspace)
     ((string-equal char-sym "page") #\page)
     ((string-equal char-sym "rubout") #\rubout)
-    ((eq (length char-sym) 1) (aref char-sym 0))
+    ((eq (length char-sym) 1) (string-aref char-sym 0))
     (t (error 'invalid-character-error :value char-sym))
     ))
 
-(defun read-character-symbol (str token-offset &optional (starting 0))
+(defun read-character-symbol (str token-offset &optional (starting nil))
   (let ((c (ptr-read-byte str)))
+    (format *standard-output* "read-char-symbol ~A ~A ~A ~A ~A~%" str c (code-char c) (space? c) (null c))
     (cond
-      ((or (space? c) (null c))
+      ((or (space? c) (null c) (not (symbol-char? c)))
        (ptr-write-byte 0 token-offset)
-       (values 'char (character-by-name (ptr-read-string starting)) str (+ 1 token-offset)))
+       (values 'character
+               (char-code (character-by-name (ptr-read-string (or starting token-offset))))
+               str
+               (+ 1 token-offset)))
       (t
        (ptr-write-byte c token-offset)
-       (read-character-symbol (+ 1 str) (+ 1 token-offset) (or starting str))))))
+       (read-character-symbol (+ 1 str) (+ 1 token-offset) (or starting token-offset))))))
 
 (defun read-character (str token-offset &optional char)
   (let ((c (ptr-read-byte str)))
-    (format *standard-output* "char ~A ~A ~%" c char)
+    (format *standard-output* "char ~A ~A ~%" c (if char (code-char char)))
     (cond
       (char (if (and (symbol-char? char) (symbol-char? c))
                 (read-character-symbol (- str 1) token-offset)
                 (values 'character char str token-offset)))
       ((not char) (read-character (+ 1 str) token-offset c))
-      (t (error 'invalid-token-error :offset str :value c)))))
+      (t (error 'invalid-character-error :offset str :char c)))))
 
 (defun read-reader-macro (str token-offset)
   (let ((c (ptr-read-byte str)))
@@ -198,7 +213,7 @@
       ((eq c (char-code #\-)) (values 'condition nil str token-offset))
       ;; anything else
       ;; todo lookup in table
-      (t (error 'invalid-token-error :offset str))
+      (t (error 'invalid-character-error :offset str :char c))
       ))
   )
 
