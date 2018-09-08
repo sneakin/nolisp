@@ -234,20 +234,27 @@
 
 (defun emit-tailcall (asm-stack reg data-offset args callers-bindings)
   ;; pop values, pop caller's values moving stack frame over caller's, call
-  (emit-call-jump (emit-op (emit-poppers (emit-pop-values asm-stack args)
-                                         (/ callers-bindings *REGISTER-SIZE*))
-                           :nop) 
+  (emit-call-jump (emit-poppers (emit-pop-values asm-stack args)
+                                (/ callers-bindings *REGISTER-SIZE*)) 
                   reg data-offset))
 
 (defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
+  ;; comments are reverse from how the code is emitted
+  ;; perform a reset
   (emit-op
+   ;; call init
    (emit-reg-call
+    ;; bind init
     (emit-store-data-value
-     (emit-integer (emit-op
-                    (emit-integer (emit-op asm-stack :load 10 0 15)
-                                  code-segment)
-                    :load 9 0 15)
-                   data-segment)
+     (emit-integer
+      ;; setup DS
+      (emit-op
+       (emit-integer
+        ;; setup CS
+        (emit-op asm-stack :load 10 0 15)
+        code-segment)
+       :load 9 0 15)
+      data-segment)
      (env-data-position init toplevel-start toplevel))
     0)
    :reset))

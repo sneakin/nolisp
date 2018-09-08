@@ -44,36 +44,38 @@
             post-env)))
 
 ;; todo calls need to check if # args matches the arity
-
-(defun compile-funcall-it (package str asm-stack env-start env func-name reg data-offset args tail-call)
-  (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
-  (if tail-call
-      (compile-funcall-tail package str asm-stack env-start env reg data-offset args)
-      (compile-funcall-push package str asm-stack env-start env reg data-offset args)))
-
 ;; todo raise an error when an explicit function arity does not match number of arguments
 
-(defun compile-funcall-resolve (package offset asm-stack env-start env func-name args tail-call)
+(defun compile-funcall-resolve (package env-start env func-name args)
+  "Try to resolve a function name in the lexical bindings and then the toplevel returning the DS or CS register and offset in that segment."
   (let* ((stack-pos (env-stack-position func-name env-start env))
          (func-name-arity (gen-func-name package func-name args))
          (data-pos (env-function-position func-name-arity
                                           (package-symbols-buffer package)
                                           (package-symbols-next-offset package))))
     (if stack-pos
-        (compile-funcall-it package offset asm-stack env-start env func-name 11 stack-pos args tail-call)
+        (values 11 stack-pos)
         (if data-pos
-            (compile-funcall-it package offset asm-stack env-start env func-name 9 data-pos args tail-call)
-            (error 'undefined-function-error :offset offset :name func-name-arity)))))
+            (values 9 data-pos)
+            nil))))
+
+(defun compile-funcall-it (package str asm-stack env-start env func-name args tail-call)
+  (multiple-value-bind (reg data-offset)
+      (compile-funcall-resolve package env-start env func-name args)
+    (unless reg (error 'undefined-function-error :offset str :name func-name-arity))
+    (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
+    (if tail-call
+        (compile-funcall-tail package str asm-stack env-start env reg data-offset args)
+        (compile-funcall-push package str asm-stack env-start env reg data-offset args))))
 
 (defun compile-call-argument (package str str-end asm-stack env-start env func-name arg tail-call)
-  ;; until an #\) is read
-  ;;   call each argument
   (format *standard-output* ";; Argument ~A~%" arg)
+  ;; compile the current argument
   (multiple-value-bind (offset new-asm-stack new-env token-kind token-value)
       (repl-compile-inner package str str-end asm-stack env-start env)
+    ;; make the call when an #\) is read
     (if (and (eq token-kind 'special) (eq token-value (char-code #\))))
-        ;; make the call
-        (compile-funcall-resolve package offset new-asm-stack env-start new-env func-name arg tail-call)
+        (compile-funcall-it package offset new-asm-stack env-start new-env func-name arg tail-call)        
         ;; push result onto stack and move to the next argument
         (compile-call-argument package offset str-end (emit-push new-asm-stack 0) env-start (env-push-binding 0 new-env) func-name (+ 1 arg) tail-call))))
 
@@ -229,8 +231,8 @@
           (let* ((asm-stack (emit-return asm-stack))
                  (cs (package-code-segment-offset package)))
             (package-copy-to-code-segment package
-                                                  (or starting-asm-stack orig-asm-stack)
-                                                  (- asm-stack (or starting-asm-stack orig-asm-stack)))
+                                          (or starting-asm-stack orig-asm-stack)
+                                          (- asm-stack (or starting-asm-stack orig-asm-stack)))
             (format *standard-output* ";;    code segment ~A ~A ~A~%" cs (package-code-segment-position package) *code-segment*)
             (values offset
                     ;; emit the address for toplevel's initializer, offset from CS
@@ -745,7 +747,7 @@
       (multiple-value-bind (kind value offset)
           (compile-read-token package offset)
         (unless (and (eq kind 'special) (eq value (char-code #\)))) (error 'invalid-token-error :offset start-offset :kind kind :value value))
-        (compile-apply-values-call package offset asm-stack env-start env)))))
+        (compile-apply-values-call offset asm-stack env-start env)))))
 
 ;;; multiple-value-bind
 
@@ -1041,7 +1043,7 @@
                               (compile-scan-list package (+ 2 offset))))
                         str-end
                         asm-stack
-                       
+                        
                         env-start env)))
 
 ;;; The actual entry point for the compiler, sorta.
