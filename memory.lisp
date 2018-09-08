@@ -133,7 +133,6 @@
 (defun ptr-find-string-equal (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
-        (format *standard-output* "find-string-equal ~A ~A~%" str current)
         (if (> (length current) 0)
             (if (string-equal current str)
                 stack-start

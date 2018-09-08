@@ -3,13 +3,13 @@
 (in-package :repl)
 
 #+:repl
-(defun compiler-output-string-segment-data (obj))
+(defun package-string-segment-data (obj))
 #+:repl
-(defun compiler-output-string-segment-end (obj))
+(defun package-string-segment-end (obj))
 #+:repl
-(defun set-compiler-output-string-segment-position (obj n))
+(defun set-package-string-segment-position (obj n))
 
-(defun symbol-id (symbol-offset &optional (segment (compiler-output-string-segment-data *COMPILER*)))
+(defun symbol-id (symbol-offset &optional (segment (package-string-segment-data *COMPILER*)))
   (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
 
 (defun symbol-string (symbol-offset)
@@ -22,7 +22,7 @@
 
 #+:repl
 (defun symbolp (ptr)
-  (> ptr (compiler-output-string-segment-data *COMPILER*)))
+  (> ptr (package-string-segment-data *COMPILER*)))
 
 (defun keyword? (sym)
   (eq (ptr-read-byte sym)
@@ -40,7 +40,7 @@
           (symbol-has-arity? (+ sym 1)))))
 
 #+:repl
-(defun symbol-concat (a b &optional c d e (offset (compiler-output-string-segment-end *COMPILER*)) orig-offset)
+(defun symbol-concat (a b &optional c d e (offset (package-string-segment-end *COMPILER*)) orig-offset)
   (if b
       (symbol-concat b c d e nil (ptr-copy a offset (string-length a)) (or orig-offset offset))
       (values orig-offset (ptr-write-byte 0 offset))

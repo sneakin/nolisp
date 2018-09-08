@@ -22,21 +22,21 @@
       (repl-compile state o-offset o-str-end o-asm-stack env-start o-env)
     (write-to-file path
                    output
-                   (compiler-output-code-segment-buffer state)
-                   (compiler-output-code-segment-offset state)
+                   (package-code-segment-buffer state)
+                   (package-code-segment-offset state)
                    o-asm-stack
                    asm-stack
-                   (compiler-output-string-segment-data state)
-                   (compiler-output-string-segment-offset state)
+                   (package-string-segment-data state)
+                   (package-string-segment-offset state)
                    env-start
                    env
-                   (compiler-output-symbols-buffer state)
-                   (compiler-output-symbols-next-offset state))))
+                   (package-symbols-buffer state)
+                   (package-symbols-next-offset state))))
 
 (defun repl-file (path &optional (buffer-size (ceiling (/ (length *memory*) 9))) (output-path (concatenate 'string path ".bin")))
   (let ((str-end (ptr-read-file path 0)))
-    (with-allocation (state (compiler-output-size))
-      (compiler-output-init state buffer-size (* 8 buffer-size))
+    (with-allocation (state (package-size))
+      (package-init state buffer-size (* 8 buffer-size))
       (compile-to-file output-path
                        state
                        (* buffer-size 6)
