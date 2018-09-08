@@ -17,20 +17,32 @@
       (format *standard-output* "Size ~A~%" size)
       (write-sequence (ptr-read-array output size) f))))
 
-(defun compile-to-file (path output o-offset o-str-end o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel)
-  (multiple-value-bind (offset code-segment asm-stack token-offset env toplevel)
-      (repl-compile o-offset o-str-end o-code-segment o-asm-stack o-token-offset env-start o-env o-toplevel o-toplevel)
-    (write-to-file path output o-code-segment code-segment o-asm-stack asm-stack o-token-offset token-offset env-start env o-toplevel toplevel)))
+(defun compile-to-file (path state output o-offset o-str-end o-asm-stack env-start o-env)
+  (multiple-value-bind (offset asm-stack env)
+      (repl-compile state o-offset o-str-end o-asm-stack env-start o-env)
+    (write-to-file path
+                   output
+                   (compiler-output-code-segment-buffer state)
+                   (compiler-output-code-segment-offset state)
+                   o-asm-stack
+                   asm-stack
+                   (compiler-output-string-segment-data state)
+                   (compiler-output-string-segment-offset state)
+                   env-start
+                   env
+                   (compiler-output-symbols-buffer state)
+                   (compiler-output-symbols-next-offset state))))
 
 (defun repl-file (path &optional (buffer-size (ceiling (/ (length *memory*) 9))) (output-path (concatenate 'string path ".bin")))
   (let ((str-end (ptr-read-file path 0)))
-    (compile-to-file output-path
-                     (* buffer-size 6)
-                     0
-                     str-end
-                     (* buffer-size 1)
-                     (* buffer-size 3)
-                     (* buffer-size 5)
-                     (* buffer-size 7)
-                     (+ (* buffer-size 7) 4)
-                     (* buffer-size 8))))
+    (with-allocation (state (compiler-output-size))
+      (compiler-output-init state buffer-size (* 8 buffer-size))
+      (compile-to-file output-path
+                       state
+                       (* buffer-size 6)
+                       0
+                       str-end
+                       (* buffer-size 3)
+                       (* buffer-size 7)
+                       (+ (* buffer-size 7) 4)))))
+

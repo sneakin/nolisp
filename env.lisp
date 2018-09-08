@@ -51,13 +51,10 @@
     (if pos
         (- (/ (- env env-start) *REGISTER-SIZE*) pos 1))))
 
-(defun env-function-position (func-name arity env-start env token-offset)
+(defun env-function-position (func-name env-start env)
   "Returns the index of FUNC-NAME in the code segment."
-  (let* ((func-name-arity (if (symbol-has-arity? func-name)
-                              func-name
-                              (gen-func-name func-name arity token-offset)))
-         (idx (env-data-position func-name-arity env-start env)))
-    (format *standard-output* ";; resolving ~A for an arity of ~A to ~A~%" (symbol-string func-name) arity idx)
+  (let* ((idx (env-data-position func-name env-start env)))
+    (format *standard-output* ";; resolving ~A to ~A~%" (symbol-string func-name) idx)
     (if idx
         idx
         (env-data-position func-name env-start env))))

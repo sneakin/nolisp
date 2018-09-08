@@ -1,11 +1,7 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 ;;; Memory
 
-(require "null")
 (require "type-sizes")
-#+:repl
-(require "runtime/memory")
-
 (in-package :repl)
 
 ;;; All input comes in through *MEMORY* and any array values like symbols
@@ -16,6 +12,9 @@
 (defvar *MEMORY* 0)
 
 #+:repl (require "runtime/memory")
+
+(defun null? (c)
+  (eq c 0))
 
 #+:sbcl
 (defun ptr-read-byte (ptr)
@@ -134,6 +133,7 @@
 (defun ptr-find-string-equal (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
+        (format *standard-output* "find-string-equal ~A ~A~%" str current)
         (if (> (length current) 0)
             (if (string-equal current str)
                 stack-start
@@ -192,7 +192,12 @@
   *allocate-next-offset*)
 
 #+:sbcl
-(defmacro with-allocation (binding bytes &rest body)
-  `(let ((,binding (allocate ,bytes)))
-       ,@body
-       (unallocate ,bytes)))
+(defmacro with-allocation (binding &rest body)
+  (let ((bytes (second binding))
+        (binding (first binding)))
+    `(let* ((,binding (allocate ,bytes))
+            (ret (progn ,@body)))
+       (unallocate ,bytes)
+       ret)))
+
+

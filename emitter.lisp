@@ -84,22 +84,22 @@
   (emit-integer (emit-op asm-stack :store register 0 9) (* *REGISTER-SIZE* offset))
   )
 
-(defun emit-lookup-call (asm-stack symbol env-start env)
+(defun emit-lookup-call (asm-stack symbol symbol-index)
   ;; load the symbol value into R1 and the toplevel lookup from the top of the stack
   ;; todo need to lookup the lookup function since lambad's set env to env-start
   (format *standard-output* ";;  globally~%")
   (emit-integer (emit-op (emit-integer (emit-op (emit-integer (emit-op asm-stack 'load 1 0 15)
                                                               symbol)
                                                 :load 0 0 11)
-                                       (- env env-start))
+                                       (symbol-index-position symbol-index))
                          :call 0 10)
                 0))
 
-(defun emit-lookup-global (asm-stack symbol env-start env)
+(defun emit-lookup-global (asm-stack symbol symbol-index)
   ;; search env for symbol
   ;; if found, get its position and emit code to load its value
-  (format *standard-output* ";; Lookup global ~A ~A~%" (symbol-string symbol) env)
-  (let ((stack-pos (env-data-position symbol env-start env)))
+  (format *standard-output* ";; Lookup global ~A ~A~%" (symbol-string symbol) symbol-index)
+  (let ((stack-pos (symbol-index-offset symbol-index symbol)))
     (if stack-pos
         (emit-load-data-value asm-stack stack-pos))))
 
@@ -111,32 +111,32 @@
     (if stack-pos
         (emit-load-stack-value asm-stack stack-pos))))
 
-(defun emit-lookup-inner (asm-stack symbol env-start env toplevel-start toplevel)
+(defun emit-lookup-inner (asm-stack symbol env-start env toplevel)
   (let ((new-asm (emit-lookup-local asm-stack symbol env-start env)))
     (if new-asm
         new-asm
-        (emit-lookup-global asm-stack symbol toplevel-start toplevel))))
+        (emit-lookup-global asm-stack symbol toplevel))))
 
-(defun emit-lookup (asm-stack symbol env-start env toplevel-start toplevel)
-  (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))
+(defun emit-lookup (asm-stack symbol env-start env toplevel)
+  (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
     (if new-asm
         new-asm
         (error 'undefined-variable-error :name symbol))))
 
-(defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel-start toplevel)
-  (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel-start toplevel)))
+(defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel)
+  (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
     (if new-asm
         new-asm
         (emit-value asm-stack 'integer 0))))
 
-(defun emit-toplevel-store-reg (asm-stack name toplevel-start toplevel &optional (reg 0))
+(defun emit-toplevel-store-reg (asm-stack name toplevel &optional (reg 0))
   (emit-store-data-value  asm-stack
-                          (env-data-position name toplevel-start toplevel)
+                          (symbol-index-offset toplevel name)
                           reg))
 
-(defun emit-toplevel-store-value (asm-stack name kind value toplevel-start toplevel)
+(defun emit-toplevel-store-value (asm-stack name kind value toplevel)
   (emit-toplevel-store-reg (emit-value asm-stack kind value)
-                           name toplevel-start toplevel))
+                           name toplevel))
 
 (defun emit-push (asm-stack src)
   (emit-op asm-stack :push src))

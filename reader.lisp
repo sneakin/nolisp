@@ -3,7 +3,6 @@
 (require "conditions")
 
 (require "memory")
-(require "null")
 (require "symbol")
 (require "sequence")
 
