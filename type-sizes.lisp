@@ -6,6 +6,7 @@
 (defvar *SIZEOF_BYTE* 1)
 (defvar *SIZEOF_SHORT* 2)
 (defvar *SIZEOF_USHORT* 2)
+(defvar *SIZEOF_POINTER* 4)
 (defvar *SIZEOF_LONG* 4)
 (defvar *SIZEOF_ULONG* 4)
 (defvar *SIZEOF_FLOAT* 4)
@@ -18,7 +19,8 @@
              (format stream "Unknown data type: ~A~%" (slot-value condition 'type)))))
 
 (defun type-atom? (type)
-  (or (eq type :byte)
+  (or (eq type :pointer)
+      (eq type :byte)
       (eq type :short)
       (eq type :long)
       (eq type :float)
@@ -28,7 +30,7 @@
 
 (defun type-size (type)
   (cond
-    ((or (eq type :long) (eq type :ulong))
+    ((or (eq type :long) (eq type :ulong) (eq type :pointer))
      *SIZEOF_LONG*)
     ((or (eq type :short) (eq type :ushort))
      *SIZEOF_SHORT*)
