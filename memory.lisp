@@ -36,9 +36,17 @@
   (dotimes (n (length array))
     (ptr-write-byte (aref array n) (+ ptr n))))
 
-(defun ptr-read-short (ptr)
+(defun ptr-read-ushort (ptr)
   (logior (ptr-read-byte ptr)
           (ash (ptr-read-byte (+ ptr 1)) 8)))
+
+#+:sbcl
+(defun ptr-read-short (ptr)
+  (let ((n (ptr-read-ushort ptr)))
+    (if (eq 0 (logand n #x8000))
+        n
+        (- (- n #xFFFF) 1))))
+
 
 #+:sbcl
 (defun mask-ulong (byte n)
@@ -53,11 +61,18 @@
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
 
 #+:sbcl
-(defun ptr-read-long (ptr)
+(defun ptr-read-ulong (ptr)
   (logior (ptr-read-byte ptr)
           (ash (ptr-read-byte (+ ptr 1)) 8)
           (ash (ptr-read-byte (+ ptr 2)) 16)
           (ash (ptr-read-byte (+ ptr 3)) 24)))
+
+#+:sbcl
+(defun ptr-read-long (ptr)
+  (let ((n (ptr-read-ulong ptr)))
+    (if (eq 0 (logand n #x80000000))
+        n
+        (- (- n #xFFFFFFFF) 1))))
 
 #+:sbcl
 (defun ptr-write-long (n ptr)
@@ -65,8 +80,7 @@
   (ptr-write-byte (mask-ulong 0 n) ptr)
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr))
   (ptr-write-byte (mask-ulong 2 n) (+ 2 ptr))
-  (ptr-write-byte (mask-ulong 3 n) (+ 3 ptr))
-  )
+  (ptr-write-byte (mask-ulong 3 n) (+ 3 ptr)))
 
 #+:sbcl
 (defun ptr-write-string (str ptr)
@@ -83,7 +97,7 @@
 (defun ptr-copy (src dest count)
   (if (> count *SIZEOF_LONG*)
       (progn
-        (ptr-write-long (ptr-read-long src) dest)
+        (ptr-write-long (ptr-read-ulong src) dest)
         (ptr-copy (+ src *SIZEOF_LONG*) (+ dest *SIZEOF_LONG*) (- count *SIZEOF_LONG*)))
       (if (> count 0)
           (progn
@@ -157,14 +171,28 @@
             (ptr-zero (+ offset 1) (- count 1)))
           offset)))
 
+(defun ptr-write (value ptr)
+  (cond
+    ((floatp value) (ptr-write-float value ptr))
+    ((stringp value) (ptr-write-string value ptr))
+    ((symbolp value) (ptr-write-string (symbol-string value) ptr))
+    (t (ptr-write-long value ptr))))
+
 (defun ptr-cons (stack &optional head tail)
-  (ptr-write-long tail (ptr-write-long head stack)))
+  (ptr-write tail (ptr-write head stack)))
 
 (defun ptr-head (stack)
-  (ptr-read-long stack))
+  (ptr-read-ulong stack))
 
 (defun ptr-rest (stack)
   (+ stack *SIZEOF_LONG*))
+
+(defun ptr-tail (stack)
+  (ptr-read-ulong (ptr-rest stack)))
+
+(defun ptr-tail-float (stack)
+  (ptr-read-float (ptr-rest stack)))
+
 
 #-:sbcl
 (defun pointer-of (needle haystack)

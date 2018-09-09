@@ -22,8 +22,10 @@
            :ptr-write-byte
            :ptr-read-array
            :ptr-read-short
+           :ptr-read-ushort
            :ptr-write-short
            :ptr-read-long
+           :ptr-read-ulong
            :ptr-write-long
            :ptr-read-float
            :ptr-write-float

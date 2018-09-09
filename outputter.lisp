@@ -11,7 +11,7 @@
 
 (defun write-toplevel (output toplevel-start toplevel string-segment)
   (if (<= toplevel-start toplevel)
-      (write-toplevel (ptr-write-long (- (ptr-read-long toplevel-start) string-segment) output)
+      (write-toplevel (ptr-write-long (- (ptr-read-ulong toplevel-start) string-segment) output)
                       (+ toplevel-start *SIZEOF_LONG*)
                       toplevel
                       string-segment)))

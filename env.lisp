@@ -40,7 +40,7 @@
 (defun env-symbol-position (sym env-start env &optional (n 0))
   "Returns the binding slot index of SYM in the environment defined by ENV-START and ENV."
   (if (> env env-start)
-      (if (eq (ptr-read-long (- env *REGISTER-SIZE*)) sym)
+      (if (eq (ptr-read-ulong (- env *REGISTER-SIZE*)) sym)
           n
           (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
       nil))
