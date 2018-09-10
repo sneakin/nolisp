@@ -44,6 +44,9 @@
 (defun list-terminator-for (c)
   (string-aref *LIST-TERMINATORS* (index-of c *LIST-INITIATORS*)))
 
+(defun list-terminator-code-for (c)
+  (char-code (list-terminator-for c)))
+
 (defun newline? (c)
   (or (eq c (char-code #\newline)) (eq c (char-code #\return))))
 
