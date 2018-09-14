@@ -1,7 +1,7 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 (require "runtime/logic")
 
-(defun null? (c)
+(defun zero? (c)
   (eq c 0))
 
 (defun null (c)

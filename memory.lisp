@@ -13,7 +13,7 @@
 
 #+:repl (require "runtime/memory")
 
-(defun null? (c)
+(defun zero? (c)
   (eq c 0))
 
 #+:sbcl
@@ -90,7 +90,7 @@
 
 #+:repl
 (defun string-length (str &optional (n 0))
-  (if (null? (ptr-read-byte str))
+  (if (zero? (ptr-read-byte str))
       n
       (string-length (+ str 1) (+ n 1))))
 
@@ -113,7 +113,7 @@
 #+:sbcl
 (defun ptr-read-string (ptr &optional count acc (n 0))
   (let* ((c (ptr-read-byte ptr)))
-    (if (or (and count (>= n count)) (null? c))
+    (if (or (and count (>= n count)) (zero? c))
         acc
         (progn
           (setf acc (concatenate 'string acc (list (code-char c))))
@@ -122,7 +122,7 @@
 #+:repl
 (defun ptr-read-string (ptr &optional count acc (n 0))
   (let* ((c (ptr-read-byte ptr)))
-    (if (or (and count (>= n count)) (null? c))
+    (if (or (and count (>= n count)) (zero? c))
         acc
         (progn
           (ptr-read-string (+ 1 ptr) count (ptr-write-byte c acc) (+ 1 n))))))
@@ -182,23 +182,30 @@
   (ptr-write tail (ptr-write head stack)))
 
 (defun ptr-head (stack)
-  (ptr-read-ulong stack))
+  (if stack (ptr-read-ulong stack)))
 
 (defun ptr-rest (stack)
-  (+ stack *SIZEOF_LONG*))
+  (if stack
+      (let ((addr (+ stack *SIZEOF_LONG*)))
+        (if (zero? (ptr-head addr))
+            nil
+            addr))))
 
 (defun ptr-tail (stack)
-  (ptr-read-ulong (ptr-rest stack)))
+  (if stack
+      (let ((addr (ptr-rest stack)))
+        (if addr (ptr-read-ulong addr)))))
 
 (defun ptr-tail-float (stack)
-  (ptr-read-float (ptr-rest stack)))
-
+  (if stack
+      (let ((addr (ptr-rest stack)))
+        (if addr (ptr-read-float addr)))))
 
 #-:sbcl
 (defun pointer-of (needle haystack)
   (let ((h (ptr-read-byte haystack)))
     (cond
-      ((null? h) nil)
+      ((zero? h) nil)
       ((eq needle h) haystack)
       (t (pointer-of needle (+ 1 haystack))))))
 

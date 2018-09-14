@@ -31,23 +31,20 @@
             (repl-resolve-path mod-name (rest extensions))))
       nil))
 
-
 (defun repl-module-loader (mod-name)
   (let* ((file-name (repl-resolve-path mod-name)))
     (unless file-name (error 'repl-module-not-found-error :module mod-name :path file-name))
     (format *error-output* "Requiring ~A ~A~%" mod-name file-name)
     (if (load file-name)
         (provide mod-name)
-        (error 'repl-load-error :module mod-name :path file-name)))
-  )
+        (error 'repl-load-error :module mod-name :path file-name))))
 
 (defun repl-load (&optional reload)
   (unless (find #'repl-module-loader *module-provider-functions*)
     (push #'repl-module-loader *module-provider-functions*))
   (if (and reload (find "REPL" *modules* :test #'string=))
       (setf *modules* nil))
-  (require :repl)
-  )
+  (require :repl))
 
 (defun repl-reload ()
   (load "sbcl.lisp")
