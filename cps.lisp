@@ -12,59 +12,95 @@
 (defconstant *IF* (intern "IF" :cl-user))
 (defconstant *MVB* (intern "MVB" :cl-user))
 
-(defun to-cps-atom (cell cc)
-  (funcall cc cell))
-
 (defun lambda? (cell)
   (and (listp cell)
        (or (equal (symbol-name (first cell)) "λ") ; eq λ wasn't working
            (eq (first cell) *FN*)
            (eq (first cell) 'lambda))))
 
-(defun to-cps-value (cell)
+(defun to-cps-value (cell captures)
   (cond
     ((and (not (atom cell))
           (lambda? cell))
      (let ((vars (second cell))
            (expr (rest (rest cell)))
            (cc-sym (gensym)))
-       `(fn (,@vars ,cc-sym) ,(to-cps-list expr (lambda (r)
-                                                 `(call ,cc-sym ,@r))))))
-    (t cell)))
+       (multiple-value-bind (captures expr)
+           (to-cps-list expr
+                        captures
+                        (lambda (captures r)
+                          (values captures `(call ,cc-sym ,@r ,captures))))
+         (values captures `(fn (,@vars ,cc-sym) ,captures ,expr)))))
+    (t (values captures cell))))
 
-(defun to-cps-list (cell cc)
+(defun to-cps-list (cell captures cc)
   (cond
     ((null cell)
-     (funcall cc nil))
+     (funcall cc captures nil))
     ((listp cell)
      (to-cps (first cell)
-             (lambda (f)
+             captures
+             (lambda (f-caps f)
                (to-cps-list (rest cell)
-                            (lambda (g)
-                              (funcall cc (cons f g)))))))))
+                            f-caps
+                            (lambda (g-caps g)
+                              (funcall cc g-caps (cons f g)))))))))
 
-(defun to-cps (cell &optional (cc #'identity) args)
+
+
+(defun to-cps (cell &optional captures (cc #'values) args)
   (cond
+    ((null cell)
+     (funcall cc captures nil))
     ((or (atom cell) (lambda? cell))
-     (funcall cc (to-cps-value cell)))
+     (multiple-value-bind (captures expr)
+         (to-cps-value cell captures)
+       (funcall cc
+                (if (symbolp cell)
+                    (cons cell captures)
+                    captures)
+                expr)))
     ((eq (first cell) *IF*)
-     (to-cps (second cell)
-             (lambda (cr)
-               `(if ,cr
-                    ,`(fn () ,(to-cps (third cell) (lambda (rr) (funcall cc rr)) args))
-                    ,`(fn () ,(to-cps (fourth cell) (lambda (rr) (funcall cc rr)) args))))))
+     (to-cps (second cell) captures
+             (lambda (test-captures cr)
+               (multiple-value-bind (then-captures then-expr)
+                   (to-cps (third cell)
+                           test-captures
+                           (lambda (captures rr)
+                             (funcall cc captures rr))
+                           args)
+                 (multiple-value-bind (else-captures else-expr)
+                     (to-cps (fourth cell)
+                             test-captures
+                             (lambda (captures rr)
+                               (funcall cc captures rr))
+                             args)
+                   (values (remove-duplicates (append else-captures then-captures))
+                           `(if ,cr ,test-captures
+                                ,`(fn () ,then-captures ,then-expr)
+                                ,`(fn () ,else-captures ,else-expr))))))))
     ((eq (first cell) *MVB*)
      (to-cps (third cell)
-             (lambda (r)
+             captures
+             (lambda (captures r)
                (declare (ignorable r))
-               (to-cps (fourth cell) (lambda (rr) (funcall cc rr))))
+               (to-cps (fourth cell)
+                       captures
+                       (lambda (captures rr)
+                         (funcall cc captures rr))))
              (second cell)))
-    (t (let* ((cc-sym (gensym))
-              (cont `(fn ,(if args args (list cc-sym))
-                         ,(funcall cc cc-sym))))
-         (to-cps (first cell)
-                 (lambda (f)
-                   (to-cps-list (rest cell)
-                                (lambda (e)
-                                  `(call ,f ,@e ,cont))))
-                 args)))))
+    (t (to-cps (first cell)
+               captures
+               (lambda (captures f)
+                 (to-cps-list (rest cell)
+                              captures
+                              (lambda (captures e)
+                                (let* ((cc-sym (gensym))           
+                                       (cont (multiple-value-bind (captures expr)
+                                                 (funcall cc captures cc-sym)
+                                               `(fn ,(if args (append args (list cc-sym)) (list cc-sym))
+                                                    ,captures
+                                                    ,expr))))
+                                  (values captures `(call ,f ,e ,captures ,cont)))
+                                )))
+               args))))
