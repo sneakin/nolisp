@@ -89,7 +89,16 @@
                      (slot-value condition 'name)))))
 
 #+:sbcl
-(define-condition undefined-variable-error (undefined-error) ())
+(define-condition undefined-variable-error (undefined-error)
+  ((args :initarg :args :initform 0))
+  (:report (lambda (condition stream)
+             (format stream
+                     "~A at ~A: ~A/~A ~A~%"
+                     (type-of condition)
+                     (slot-value condition 'offset)
+                     (symbol-string (slot-value condition 'name))
+                     (slot-value condition 'args)
+                     (slot-value condition 'name)))))
 #+:sbcl
 (define-condition undefined-function-error (undefined-error) ())
 

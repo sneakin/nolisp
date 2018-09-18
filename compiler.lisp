@@ -50,9 +50,12 @@
   "Try to resolve a function name in the lexical bindings and then the toplevel returning the DS or CS register and offset in that segment."
   (let* ((stack-pos (env-stack-position func-name env-start env))
          (func-name-arity (gen-func-name package func-name args))
-         (data-pos (env-function-position func-name-arity
-                                          (package-symbols-buffer package)
-                                          (package-symbols-next-offset package))))
+         (data-pos (or (env-function-position func-name-arity
+                                              (package-symbols-buffer package)
+                                              (package-symbols-next-offset package))
+                       (env-function-position func-name
+                                              (package-symbols-buffer package)
+                                              (package-symbols-next-offset package)))))
     (if stack-pos
         (values 11 stack-pos)
         (if data-pos
@@ -62,7 +65,7 @@
 (defun compile-funcall-it (package str asm-stack env-start env func-name args tail-call)
   (multiple-value-bind (reg data-offset)
       (compile-funcall-resolve package env-start env func-name args)
-    (unless reg (error 'undefined-function-error :offset str :name func-name-arity))
+    (unless reg (error 'undefined-function-error :offset str :name func-name :args args))
     (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
     (if tail-call
         (compile-funcall-tail package str asm-stack env-start env reg data-offset args)
@@ -210,7 +213,7 @@
   (multiple-value-bind (call-end)
       (compile-scan-list package offset) ; todo pre-tokenize so this is done once
     (multiple-value-bind (kind value offset)
-        (compile-read-token package call-end)
+        (compile-read-token package (- call-end 1))
       (and (eq kind 'special) (eq value (char-code #\)))))))
 
 (defun compile-progn (package offset str-end asm-stack env-start env tail-call &optional (n 0))
@@ -411,7 +414,7 @@
 
 (defun compile-set-global (name package start-offset str-end asm-stack env-start env)
   ;; compile the value
-  (format *standard-output* ";; setting global ~A ~A ~A ~A~%" (symbol-string name) name (package-symbols-next-offset package))
+  (format *standard-output* ";; setting global ~A ~A ~A~%" (symbol-string name) name (package-symbols-next-offset package))
   (multiple-value-bind (offset asm-stack env kind value)
       (repl-compile-inner package start-offset str-end asm-stack env-start env)
     (if kind (error 'malformed-error :offset start-offset :msg kind))

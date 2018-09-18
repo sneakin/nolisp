@@ -3,6 +3,7 @@
 (require "runtime/defstruct")
 (require "compiler/byte-buffer")
 (require "compiler/symbol-index")
+(require "symbol-gen")
 
 (in-package :repl)
 
@@ -25,7 +26,7 @@
   (symbol-index-buffer (package-symbols compiler)))
 
 (defun package-symbol-offset (compiler symbol)
-  (symbol-index-offset (compiler-symbol-index compiler) symbol))
+  (symbol-index-offset (package-symbols compiler) symbol))
 
 (defun package-symbols-next-offset (compiler)
   (symbol-index-next-offset (package-symbols compiler)))
