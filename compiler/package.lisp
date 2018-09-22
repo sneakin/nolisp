@@ -1,22 +1,22 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(require "runtime/defstruct")
+#-:repl (require "runtime/defstruct")
+#+:repl (require "runtime/package")
+
 (require "compiler/byte-buffer")
 (require "compiler/symbol-index")
-(require "symbol-gen")
 
 (in-package :repl)
 
+(defvar *INIT-FUNC* "__init")
+
+#+:repl (require "bootstrap/package")
+#-:repl
 (repl-defstruct package
   ((code-segment :type 'byte-buffer)
    (string-segment :type 'byte-buffer)
-   (symbols :type 'symbol-index)))
-
-(defun package-init (compiler buffer buffer-size)
-  (let ((segment-size (ceiling (/ buffer-size 9))))
-    (byte-buffer-init (package-code-segment compiler) (+ buffer (* segment-size 1)) segment-size)
-    (byte-buffer-init (package-string-segment compiler) (+ buffer (* segment-size 5)) segment-size)
-    (symbol-index-init (package-symbols compiler) segment-size (+ buffer (* segment-size 8)))))
+   (symbols :type 'symbol-index)
+   (source-files :type 'byte-buffer)))
 
 (defun package-define (compiler symbol)
   (symbol-index-define (package-symbols compiler) symbol)
@@ -71,6 +71,8 @@
   (byte-buffer-copy (package-string-segment compiler) src num-bytes)
   compiler)
 
+(require "symbol-gen")
+
 (defun package-symbol-gen (state)
   (multiple-value-bind (name offset)
       (symbol-gen (package-string-segment-offset state))
@@ -82,3 +84,26 @@
       (symbol-intern str (package-string-segment-data state) (package-string-segment-offset state))
     (set-package-string-segment-offset state offset)
     sym))
+
+(defun package-add-source-file (package src-path)
+  (byte-buffer-copy-string (package-source-files package) src-path)
+  package)
+
+(defun package-required? (package src-path)
+  (ptr-find-string-equal src-path (byte-buffer-data (package-source-files package)) (byte-buffer-offset (package-source-files package))))
+
+(defun package-init (compiler cs cs-size ds ds-size toplevel top-size src-files sf-size)
+  (byte-buffer-init (package-code-segment compiler)
+                      cs
+                      cs-size)
+    (byte-buffer-init (package-string-segment compiler)
+                      ds
+                      ds-size)
+    (symbol-index-init (package-symbols compiler)
+                       top-size
+                       toplevel)
+    (package-define compiler (package-intern compiler *INIT-FUNC*))
+    (byte-buffer-init (package-source-files compiler)
+                      src-files
+                      sf-size)
+    compiler)

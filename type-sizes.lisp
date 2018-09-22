@@ -3,6 +3,10 @@
 #+:sbcl
 (in-package :repl)
 
+#+:repl (require "runtime/eq")
+#+:repl (require "runtime/logic")
+#+:repl (require "runtime/error")
+
 (defvar *SIZEOF_BYTE* 1)
 (defvar *SIZEOF_SHORT* 2)
 (defvar *SIZEOF_USHORT* 2)
@@ -11,6 +15,8 @@
 (defvar *SIZEOF_ULONG* 4)
 (defvar *SIZEOF_FLOAT* 4)
 (defvar *REGISTER-SIZE* *SIZEOF_LONG*)
+
+#+:sbcl (require "conditions")
 
 #+:sbcl
 (define-condition unknown-data-type-error (repl-error)

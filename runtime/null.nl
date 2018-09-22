@@ -1,5 +1,5 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
-(require "runtime/logic")
+(require "runtime/eq")
 
 (defun zero? (c)
   (eq c 0))

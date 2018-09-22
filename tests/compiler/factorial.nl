@@ -3,13 +3,15 @@
 ;;; about 1024 more cycles
 
 (def - (a b)
-     (asm (mov 0 1)
-          (cls)
-          (subi 2 0 14)))
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cls)
+       (subi 1 0 14)))
 
 (def * (a b)
-     (asm (mov 0 1)
-          (muli 2)))
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (muli 1)))
 
 (def fact (n acc)
      (if n

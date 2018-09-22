@@ -7,18 +7,21 @@
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
 #+:sbcl
-(defvar *MEMORY* (make-array (* 256 1024) :element-type '(unsigned-byte 8)))
+(defvar *MEMORY* (make-array (* 256 1024 8) :element-type '(unsigned-byte 8)))
 #+:repl
 (defvar *MEMORY* 0)
 
 #+:repl (require "runtime/memory")
+#+:repl (require "runtime/math")
+#+:repl (require "runtime/string")
 
 (defun zero? (c)
   (eq c 0))
 
 #+:sbcl
 (defun ptr-read-byte (ptr)
-  (aref *MEMORY* ptr))
+  (if (< ptr (length *MEMORY*))
+      (aref *MEMORY* ptr)))
 
 #+:sbcl
 (defun ptr-write-byte (c ptr)
@@ -139,18 +142,18 @@
 (defun ptr-find-string= (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
-        (if (> (length current) 0)
-            (if (string= current str)
-                stack-start
-                (ptr-find-string= str (+ 1 stack-start (length current)) stack-end))))))
+        (if (and (> (length current) 0)
+                 (string= current str))
+            stack-start
+            (ptr-find-string= str (+ 1 stack-start (length current)) stack-end)))))
 
 (defun ptr-find-string-equal (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
-        (if (> (length current) 0)
-            (if (string-equal current str)
-                stack-start
-                (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end))))))
+        (if (and (> (length current) 0)
+                 (string-equal current str))
+            stack-start
+            (ptr-find-string-equal str (+ 1 stack-start (length current)) stack-end)))))
 
 #+:sbcl
 (defun ptr-read-file (path offset)
@@ -159,6 +162,10 @@
                      :external-format :default
                      :element-type '(unsigned-byte 8))
     (ptr-write-byte 0 (read-sequence *memory* f :start offset))))
+
+#+:repl
+(defun ptr-read-file (path offset)
+  (error 'not-implemented-error))
 
 (defun ptr-zero (offset count)
   (if (> count 4)
@@ -171,12 +178,17 @@
             (ptr-zero (+ offset 1) (- count 1)))
           offset)))
 
+#-:repl
 (defun ptr-write (value ptr)
   (cond
     ((floatp value) (ptr-write-float value ptr))
     ((stringp value) (ptr-write-string value ptr))
     ((symbolp value) (ptr-write-string (symbol-string value) ptr))
     (t (ptr-write-long value ptr))))
+
+#+:repl
+(defun ptr-write (value ptr)
+  (ptr-write-long value ptr))
 
 (defun ptr-cons (stack &optional head tail)
   (ptr-write tail (ptr-write head stack)))

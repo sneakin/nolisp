@@ -33,16 +33,24 @@
                    (package-symbols-buffer state)
                    (package-symbols-next-offset state))))
 
-(defun repl-file (path &optional (buffer-size (ceiling (/ (length *memory*) 9))) (output-path (concatenate 'string path ".bin")))
-  (let ((str-end (ptr-read-file path 0)))
+(defun repl-file (path &optional (buffer-size (ceiling (/ (length *memory*) 8))) (output-path (concatenate 'string path ".bin")) (offset 0))
+  (let ((str-end (ptr-read-file path offset)))
     (with-allocation (state (package-size))
-      (package-init state buffer-size (* 8 buffer-size))
+      (package-init state
+                    (+ offset (* buffer-size 1))
+                    buffer-size
+                    (+ offset (* buffer-size 2))
+                    buffer-size
+                    (+ offset (* buffer-size 3))
+                    buffer-size
+                    (+ offset (* buffer-size 4))
+                    buffer-size)
       (compile-to-file output-path
                        state
-                       (* buffer-size 6)
+                       (+ offset (* buffer-size 5))
                        0
                        str-end
-                       (* buffer-size 3)
-                       (* buffer-size 7)
-                       (+ (* buffer-size 7) 4)))))
+                       (+ offset (* buffer-size 6))
+                       (+ offset (* buffer-size 7))
+                       (+ (+ offset (* buffer-size 7)) 4)))))
 

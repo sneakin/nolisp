@@ -1,10 +1,12 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
 (require "memory")
-(require "runtime/defstruct")
 
 (in-package :repl)
 
+#+:repl (require "bootstrap/byte-buffer")
+#-:repl (require "runtime/defstruct")
+#-:repl
 (repl-defstruct byte-buffer
                 ((data)
                  (length :initform 0)
@@ -45,6 +47,17 @@
   (set-byte-buffer-position buffer (+ (byte-buffer-position buffer)
                                       num-bytes))
   buffer)
+
+(defun byte-buffer-copy-string (buffer src)
+  (let ((num-bytes (+ (length src) 1)))
+    (if (>= (+ (byte-buffer-position buffer) num-bytes) (byte-buffer-end buffer))
+        (error 'byte-buffer-overflow-error :buffer buffer :index (+ (byte-buffer-position buffer)
+                                                                    num-bytes)))
+    (ptr-write-string src (byte-buffer-offset buffer))
+    (set-byte-buffer-position buffer (+ (byte-buffer-position buffer)
+                                        num-bytes))
+    buffer)
+  )
 
 (defun byte-buffer-read (buffer)
   (let ((b (ptr-read-byte (+ (byte-buffer-data buffer)

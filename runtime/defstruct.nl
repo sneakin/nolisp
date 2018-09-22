@@ -1,5 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "type-sizes")
 (require "memory")
 
 (in-package :repl)
@@ -87,7 +88,7 @@
         ,(if (type-atom? (slot-def-type slot))
              `(,(slot-def-writer struct-name slot) value (,ref-method obj n))
              `(if value
-                  `(ptr-copy value (,ref-method obj n) ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot)))
+                  (ptr-copy value (,ref-method obj n) ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot)))
                   (ptr-zero (,ref-method obj n)
                             ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot)))))
         obj))))
@@ -105,7 +106,7 @@
         ,(if (type-atom? (slot-def-type slot))
              `(,(slot-def-writer struct-name slot) value (,ref-method obj))
              `(if value
-                  `(ptr-copy value (,ref-method obj) ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot)))
+                  (ptr-copy value (,ref-method obj) ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot)))
                   (ptr-zero (,ref-method obj)
                       ,(* (or (slot-def-size slot) 1) (slot-def-type-size slot))))
              )

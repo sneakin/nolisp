@@ -1,6 +1,8 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
 (require "memory")
+(require "symbol")
+(require "string")
 
 (in-package :repl)
 
@@ -11,44 +13,48 @@
           (ash (or d 0) 12)))
 
 (defun make-op (op &optional a b c)
-  (case op
-    (:NOP (make-short 0 0 0 0))
-    (:NOT (make-short 0 1 0 0))
-    (:OR (make-short 0 2 0 0))
-    (:XOR (make-short 0 3 0 0))
-    (:AND (make-short 0 4 0 0))
-    (:BSL (make-short 0 5 0 0))
-    (:INT (make-short 0 7 a b))
-    (:HALT (make-short 0 8 a b))
-    (:NEG (make-short 0 9 a b))
-    (:RTI (make-short 0 12 a b))
-    (:BSR (make-short 0 13 a b))
-    (:CLS (make-short 0 #xe a b))
-    (:INC (make-short #x1 a b c))
-    (:ADDI (make-short #x2 #x1 a b))
-    (:SUBI (make-short #x2 #x9 a b))
-    (:MULI (make-short #x2 #x2 a b))
-    (:POWI (make-short #x2 #x4 a b))
-    (:DIVI (make-short #x2 #xa a b))
-    (:CONVI (make-short #x2 #xb a b))
-    (:CMP (make-short #x2 0 a b))
-    (:CMPI (make-short #x2 0 a b))
-    (:CEILF (make-short #x4 #x6 a b))
-    (:LOAD (make-short #x5 a b c))
-    (:POP (make-short #x6 a b c))
-    (:CALL (make-short #x7 #x7 a b))
-    (:RET (make-short #x7 #xc a b))
-    (:RESET (make-short #x7 #x1 a b))
-    (:MOV (make-short #x8 a b c))
-    (:DEC (make-short #x9 a b c))
-    (:STORE (make-short #xD a b c))
-    (:PUSH (make-short #xE a b c))
+  (cond
+    ((eq op :NOP) (make-short 0 0 0 0))
+    ((eq op :NOT) (make-short 0 1 0 0))
+    ((eq op :OR) (make-short 0 2 0 0))
+    ((eq op :XOR) (make-short 0 3 0 0))
+    ((eq op :AND) (make-short 0 4 0 0))
+    ((eq op :BSL) (make-short 0 5 0 0))
+    ((eq op :INT) (make-short 0 7 a b))
+    ((eq op :HALT) (make-short 0 8 a b))
+    ((eq op :NEG) (make-short 0 9 a b))
+    ((eq op :RTI) (make-short 0 12 a b))
+    ((eq op :BSR) (make-short 0 13 a b))
+    ((eq op :CLS) (make-short 0 #xe a b))
+    ((eq op :INC) (make-short #x1 a b c))
+    ((eq op :ADDI) (make-short #x2 #x1 a b))
+    ((eq op :SUBI) (make-short #x2 #x9 a b))
+    ((eq op :MULI) (make-short #x2 #x2 a b))
+    ((eq op :POWI) (make-short #x2 #x4 a b))
+    ((eq op :DIVI) (make-short #x2 #xa a b))
+    ((eq op :CONVI) (make-short #x2 #xb a b))
+    ((eq op :CMP) (make-short #x2 0 a b))
+    ((eq op :CMPI) (make-short #x2 0 a b))
+    ((eq op :CEILF) (make-short #x4 #x6 a b))
+    ((eq op :LOAD) (make-short #x5 a b c))
+    ((eq op :POP) (make-short #x6 a b c))
+    ((eq op :CALL) (make-short #x7 #x7 a b))
+    ((eq op :RET) (make-short #x7 #xc a b))
+    ((eq op :RESET) (make-short #x7 #x1 a b))
+    ((eq op :MOV) (make-short #x8 a b c))
+    ((eq op :DEC) (make-short #x9 a b c))
+    ((eq op :STORE) (make-short #xD a b c))
+    ((eq op :PUSH) (make-short #xE a b c))
     (t (error 'unknown-op-error :op op))))
 
 (defun emit-op (stack op &optional a b c)
-  (format *standard-output* "~A ~A ~A ~A    ~A~%" op (or a 0) (or b 0) (or c 0) (make-op op a b c))
-  (ptr-write-short (make-op op a b c) stack)
-  (+ stack *SIZEOF_SHORT*))
+  (let ((op (if (symbolp op)
+                op
+                (intern (string-upcase op) "KEYWORD"))))
+    (format *standard-output* "~A ~A ~A ~A    ~A~%" op (or a 0) (or b 0) (or c 0) (make-op op a b c))
+    (ptr-write-short (make-op op a b c) stack)
+    (+ stack *SIZEOF_SHORT*))
+)
 
 (defun emit-float (stack value)
   (format *standard-output* "float32(~A)~%" value)
@@ -98,7 +104,7 @@
 (defun emit-lookup-global (asm-stack symbol symbol-index)
   ;; search env for symbol
   ;; if found, get its position and emit code to load its value
-  (format *standard-output* ";; Lookup global ~A ~A~%" (symbol-string symbol) symbol-index)
+  (format *standard-output* ";; Lookup global ~A ~A ~A~%" symbol (symbol-string symbol) symbol-index)
   (let ((stack-pos (symbol-index-offset symbol-index symbol)))
     (if stack-pos
         (emit-load-data-value asm-stack stack-pos))))
@@ -106,7 +112,7 @@
 (defun emit-lookup-local (asm-stack symbol env-start env)
   ;; search env for symbol
   ;; if found, get its position and emit code to load its value
-  (format *standard-output* ";; Lookup local ~A ~A~%" (symbol-string symbol) env)
+  (format *standard-output* ";; Lookup local ~A ~A ~A ~A ~A~%" symbol (symbol-string symbol) env-start env (symbol-id symbol))
   (let ((stack-pos (env-stack-position symbol env-start env)))
     (if stack-pos
         (emit-load-stack-value asm-stack stack-pos))))
@@ -121,7 +127,10 @@
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
     (if new-asm
         new-asm
-        (error 'undefined-variable-error :name symbol))))
+        (progn
+          (env-dump env-start env)
+          (env-dump (symbol-index-buffer toplevel) (symbol-index-next-offset toplevel))
+          (error 'undefined-variable-error :name symbol)))))
 
 (defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel)
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
@@ -138,8 +147,11 @@
   (emit-toplevel-store-reg (emit-value asm-stack kind value)
                            name toplevel))
 
-(defun emit-push (asm-stack src)
+(defun emit-push (asm-stack &optional (src 0))
   (emit-op asm-stack :push src))
+
+(defun emit-pop (asm-stack &optional (dest 0))
+  (emit-op asm-stack :pop dest))
 
 (defun emit-pushers (asm-stack n &optional (reg 0))
   (if (< reg n)
@@ -159,6 +171,9 @@
   (emit-integer (emit-op asm-stack :dec 11)
                 (align-bytes size)))
 
+(defun emit-mov (asm-stack dest src)
+  (emit-op asm-stack :mov dest src))
+
 (defun emit-stack-alloc-value (asm-stack size)
   (format *standard-output* ";; Allocating ~A bytes~%" size)
   ;; shift SP, push SP
@@ -175,9 +190,6 @@
   (format *standard-output* ";; Freeing ~A bytes~%" (+ (align-bytes size) (* 1 *REGISTER-SIZE*)))
   (emit-integer (emit-op asm-stack :inc 11) (+ (align-bytes size) (* 1 *REGISTER-SIZE*))))
 
-(defun emit-mov (asm-stack dest src)
-  (emit-op asm-stack :mov dest src))
-
 (defun emit-jump (asm-stack offset &optional (condition 0))
   (emit-integer (emit-op asm-stack :inc 12 condition) offset))
 
@@ -192,8 +204,21 @@
   (emit-op (emit-integer (emit-op asm-stack :load temp-reg 0 15) 0)
            :cmp reg temp-reg))
 
-(defun emit-return (asm-stack)
-  (emit-op asm-stack :ret))
+(defun emit-return (asm-stack &optional (num-bindings 0))
+  ;; popping of the bindings requires storing the return value, moving the return address
+  ;; to the top of the frame, popping all the bindings, and restoring the return address
+  ;; and value.
+  (emit-op (if (> num-bindings 0)
+               (emit-poppers
+                (emit-pop
+                 (emit-store-stack-value
+                  (emit-load-stack-value
+                   (emit-push asm-stack)
+                   1)
+                  (+ 1 num-bindings)))
+                num-bindings)
+               asm-stack)
+           :ret))
 
 (defun emit-reg-call (asm-stack reg)
   (emit-integer (emit-op (emit-op (emit-op asm-stack :cls #x7)
@@ -230,13 +255,51 @@
           asm-stack)))
 
 (defun emit-funcall (asm-stack reg data-offset args)
-  (emit-call (emit-pop-values asm-stack args) reg data-offset))
+  (emit-call asm-stack reg data-offset))
+
+(defun emit-copy-data-value (asm-stack src dest)
+  (emit-store-data-value (emit-load-data-value asm-stack src)
+                         dest))
+
+(defun emit-copy-stack-value (asm-stack src dest)
+  (emit-store-stack-value (emit-load-stack-value asm-stack src)
+                         dest))
+
+(defun emit-copy-stack-down (asm-stack src-offset dest-offset count)
+  "Copies a COUNT values from the SRC offset to the DEST offset going from down the stack."
+  (if (> count 0)
+      (emit-copy-stack-down (emit-copy-stack-value asm-stack
+                                                   (- src-offset 1)
+                                                   (- dest-offset 1))
+                            (- src-offset 1)
+                            (- dest-offset 1)
+                            (- count 1))
+      asm-stack))
+
+(defun emit-move-stack (asm-stack src-offset dest-offset count)
+  (emit-poppers (emit-copy-stack-down (emit-push (emit-load-stack-value asm-stack src-offset) 0)
+                                      (+ 1 src-offset)
+                                      (+ 1 dest-offset)
+                                      (+ 1 count))
+                (- (+ 1 dest-offset) (+ 1 count))))
+
+(defun emit-copy-values-down (asm-stack src dest count &optional (n (- count 1)))
+  "Copies a COUNT values from the SRC pointer to the DEST pointer going from the end of the memory region."
+  (if (>= n 0)
+      (emit-copy-values-down (emit-copy-data-value asm-stack
+                                                   (+ src n)
+                                                   (+ dest n))
+                             src
+                             dest
+                             count
+                             (- n 1))
+      asm-stack))
 
 (defun emit-tailcall (asm-stack reg data-offset args callers-bindings)
   ;; pop values, pop caller's values moving stack frame over caller's, call
-  (emit-call-jump (emit-poppers (emit-pop-values asm-stack args)
-                                (/ callers-bindings *REGISTER-SIZE*)) 
-                  reg data-offset))
+  (let ((stack-size (/ callers-bindings *REGISTER-SIZE*)))
+    (emit-call-jump (emit-move-stack asm-stack args (+ args stack-size) args)
+                    reg data-offset)))
 
 (defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
   ;; comments are reverse from how the code is emitted
@@ -255,6 +318,7 @@
         code-segment)
        :load 9 0 15)
       data-segment)
-     (env-data-position init toplevel-start toplevel))
+     (env-data-position init toplevel-start toplevel)
+     )
     0)
    :reset))

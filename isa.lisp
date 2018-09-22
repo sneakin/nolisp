@@ -67,9 +67,10 @@
                            (elt op 1))
            ;; (format *standard-output* "~A ~A ~A ~A~%" a b c d)
            (cond ,@acc
-                 (t (error 'unknown-op-error :op op)))))))
-
-  
+                 (t (cons 'unknown-op op))
+                 ; (t (error 'unknown-op-error :op op))
+                 )))))
+ 
 
 (defun gen-isa-op-data-size-case (op nibbles &optional data)
   `((eq ,op (first op))

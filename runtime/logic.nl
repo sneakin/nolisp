@@ -1,5 +1,7 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "runtime/truth")
+
 (defun or (a b)
   (if a a b))
 
@@ -9,4 +11,4 @@
       nil))
 
 (defun not (a)
-  (if a a nil))
+  (if a nil a))

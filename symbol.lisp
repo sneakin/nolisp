@@ -9,12 +9,13 @@
 #+:repl
 (defun set-package-string-segment-position (obj n))
 
-(defun symbol-id (symbol-offset &optional (segment (package-string-segment-data *COMPILER*)))
-  (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
-
 (defun symbol-string (symbol-offset)
   (if symbol-offset
       (ptr-read-string symbol-offset)))
+
+(defun symbol-id (symbol-offset &optional (segment (package-string-segment-data *COMPILER*)))
+  ;; (format *standard-output* ";; finding symbol ~A ~A in ~A~%" symbol-offset (symbol-string symbol-offset) segment)
+  (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
 
 #+:repl
 (defun symbol-name (sym)
@@ -57,6 +58,12 @@
     (if id
         (values id segment-end)
         (values segment-end off))))
+
+#+:repl
+(defun intern (sym &optional (package *COMPILER*))
+  (symbol-intern sym
+                 (package-string-segment-data package)
+                 (package-string-segment-end package)))
 
 #-:repl
 (defun symbol-concat-pkg-inner (parts &optional (acc ""))

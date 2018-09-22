@@ -3,4 +3,5 @@
 (def h1 ()
   (lambda fn (a b) (values a b)))
 
-(h1)
+((h1) 123 456)
+(asm (halt))

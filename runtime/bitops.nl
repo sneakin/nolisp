@@ -1,5 +1,8 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "runtime/eq")
+(require "runtime/cmp")
+
 (defun ash (n bit)
   (if (eq n 0)
       n

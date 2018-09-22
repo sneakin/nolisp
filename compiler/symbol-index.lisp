@@ -1,9 +1,13 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(require "runtime/defstruct")
+(require "env")
+(require "type-sizes")
 
 (in-package :repl)
 
+#+:repl (require "bootstrap/symbol-index")
+#-:repl (require "runtime/defstruct")
+#-:repl
 (repl-defstruct symbol-index
                 ((max-size)
                  (buffer)
@@ -15,7 +19,10 @@
   (set-symbol-index-next-offset index buffer))
 
 (defun symbol-index-define (index symbol)
-  (set-symbol-index-next-offset index (env-define symbol (symbol-index-buffer index) (symbol-index-next-offset index)))
+  (set-symbol-index-next-offset index
+                                (env-define symbol
+                                            (symbol-index-buffer index)
+                                            (symbol-index-next-offset index)))
   index)
 
 (defun symbol-index-position (index)

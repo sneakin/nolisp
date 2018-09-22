@@ -1,13 +1,15 @@
-(set a 0)
-(set b 0)
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(set g (lambda (x)
+(var a 0)
+(var b 0)
+
+(var g (lambda (x)
          (set a x)))
 
-(set h (lambda (x)
+(var h (lambda (x)
          (set b x)))
 
-(set f (lambda (x y)
+(var f (lambda (x y)
          (let ((z 3))
            (g z)
            (if y

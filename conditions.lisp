@@ -39,7 +39,7 @@
   (:report (lambda (condition stream)
              (format stream "Malformed form at ~A: ~A~%"
                      (slot-value condition 'offset)
-                     (or (slot-value condition 'form) (ptr-read-string (slot-value condition 'offset)))))))
+                     (or (slot-value condition 'form) (ptr-read-string (slot-value condition 'offset) 300))))))
 
 #+:sbcl
 (define-condition malformed-let-error (malformed-error) ())
@@ -82,11 +82,16 @@
    (offset :initarg :offset :initform nil))
   (:report (lambda (condition stream)
              (format stream
-                     "~A at ~A: ~A ~A~%"
+                     "~A at ~A: ~A ~A~%~A~%"
                      (type-of condition)
                      (slot-value condition 'offset)
                      (symbol-string (slot-value condition 'name))
-                     (slot-value condition 'name)))))
+                     (slot-value condition 'name)
+                     (if (slot-value condition 'offset)
+                         (ptr-read-string (- (slot-value condition 'offset)
+                                             100)
+                                          200))))))
+
 
 #+:sbcl
 (define-condition undefined-variable-error (undefined-error)

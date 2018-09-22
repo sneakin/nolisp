@@ -1,7 +1,5 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-#-:sbcl
 (defvar nil 0)
+(defvar t 't)
 
-#-:sbcl
-(defvar t 1)

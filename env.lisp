@@ -2,17 +2,19 @@
 
 (require "memory")
 (require "type-sizes")
+(require "symbol")
 
 (in-package :repl)
 
 (defun env-push-binding (name env)
   "Adds NAME to ENV and returns the new ENV stack address."
   (format *standard-output*
-          ";; Binding ~A ~A~%"
+          ";; Binding ~A ~A to ~A~%"
           (if (> name 0)
               (ptr-read-string name)
               name)
-          name)
+          name
+          env)
   (ptr-write-long name env)
   (+ *REGISTER-SIZE* env))
 
@@ -51,6 +53,8 @@
     (if pos
         (- (/ (- env env-start) *REGISTER-SIZE*) pos 1))))
 
+#+:repl (defun symbol-string (symbol-offset))
+
 (defun env-function-position (func-name env-start env)
   "Returns the index of FUNC-NAME in the code segment."
   (let* ((idx (env-data-position func-name env-start env)))
@@ -69,3 +73,35 @@
     (if pos
         env
         (env-push-binding name env))))
+
+(defun env-copy-binding (env src dest)
+  (ptr-write-long (ptr-read-long (+ env (* src *REGISTER-SIZE*)))
+                  (+ env (* dest *REGISTER-SIZE*)))
+  env)
+
+(defun env-move-bindings (env num-move dest-offset &optional (n num-move) (post-env (- env (* *REGISTER-SIZE* num-move))))
+  (if (> n 0)
+      (env-move-bindings (env-copy-binding env (- n 1) (+ dest-offset (- num-move n)))
+                         num-move
+                         dest-offset
+                         (- n 1)
+                         post-env)
+      (values (- env (* (- dest-offset num-move) *REGISTER-SIZE*))
+              post-env)))
+
+(defun env-size (env-start env)
+  (/ (- env env-start) *REGISTER-SIZE*))
+
+(defun env-name (env-binding)
+  (let ((ptr (ptr-read-ulong env-binding)))
+    (if (and ptr (not (zero? ptr)))
+        (ptr-read-string ptr))))
+
+(defun env-dump (env-start env &optional (stream *standard-output*) (n 0))
+  (if (= n 0)
+      (format stream "~%Env: ~A to ~A~%" env-start env))
+  (if (<= env-start env)
+      (progn
+        (format stream "~A ~A = ~A~%" (ptr-read-ulong env-start) (env-name env-start) n)
+        (env-dump (+ env-start *REGISTER-SIZE*) env stream (+ n 1)))
+      (format stream "~A bindings~%~%" n)))
