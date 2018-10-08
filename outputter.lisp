@@ -24,9 +24,20 @@
   (multiple-value-bind (init-sym token-offset)
       (symbol-intern *INIT-FUNC* token-start token-offset)
     (let* ((toplevel (env-define token-offset toplevel-start toplevel))
-           (asm-stack-end (emit-init asm-stack *ISR-TOTAL-SIZE* 2048 toplevel-start toplevel init-sym))
-           (code-segment-end (ptr-copy asm-start code-segment (- asm-stack-end asm-start)))
-           (isr-end (emit-integer (emit-op asm-stack :load 12 0 15) (+ *ISR-TOTAL-SIZE* (- code-segment cs-start))))
+           (asm-stack-end (emit-init asm-stack
+                                     *ISR-TOTAL-SIZE*
+                                     (align-bytes (+ (- code-segment cs-start)
+                                                     (- asm-stack asm-start)
+                                                     4096)
+                                                  4096)
+                                     toplevel-start
+                                     toplevel
+                                     init-sym))
+           (code-segment-end (ptr-copy asm-start
+                                       code-segment
+                                       (- asm-stack-end asm-start)))
+           (isr-end (emit-integer (emit-op asm-stack :load 12 0 15)
+                                  (+ *ISR-TOTAL-SIZE* (- code-segment cs-start))))
            )
       ;; zero ISR
       (ptr-zero output *ISR-TOTAL-SIZE*)

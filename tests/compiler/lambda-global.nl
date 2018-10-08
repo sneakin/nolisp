@@ -1,7 +1,5 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(def f (x)
-  (if x 12 34))
-
-(values (f 123) (f 0))
+(var f (lambda fn (a b) (values a b)))
+(f 123 456)
 (asm (halt))

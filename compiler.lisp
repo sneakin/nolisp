@@ -106,7 +106,7 @@
 
 (defun compile-if-fixer (if-offset then-offset package start-offset asm-stack env-start env)
   (let ((offset-to-else (+ (- then-offset if-offset) *SIZEOF_LONG*))
-        (offset-to-end (+ (- asm-stack then-offset *SIZEOF_LONG*))))
+        (offset-to-end (+ (- asm-stack then-offset))))
     (format *standard-output* ";; IF done ~A ~A ~A ~A ~A ~A~%" start-offset asm-stack if-offset then-offset offset-to-else offset-to-end)
     ;; correct the jump from the CMP to go to ELSE
     (ptr-write-long offset-to-else if-offset)
@@ -322,6 +322,7 @@
             (format *standard-output* ";;    code segment ~A ~A ~A~%" cs (package-code-segment-position package) *code-segment*)
             (values offset
                     ;; emit the address for toplevel's initializer, offset from CS
+                    ;; todo emits a value on each require
                     (emit-value (or starting-asm-stack orig-asm-stack) 'integer init-offset)
                     env))
           (if (eq kind nil)
@@ -350,7 +351,7 @@
            (cs (package-code-segment-offset package)))
       ;; copy code from asm-stack to code-segment
       (package-copy-to-code-segment package orig-asm-stack (- asm-stack orig-asm-stack))
-      (format *standard-output* ";; Copied to code-segment ~A ~A ~A~%" cs (- cs *code-segment*)  (- asm-stack orig-asm-stack))
+      (format *standard-output* ";; Copied to code-segment ~A ~A ~A~%" cs (- cs (package-code-segment-buffer package))  (- asm-stack orig-asm-stack))
       (values offset
               orig-asm-stack
               (env-pop-bindings env (- num-bindings 1))))))
@@ -379,7 +380,7 @@
       (cond
         ;; start of the arglist
         ((and (eq kind 'special) (eq value (char-code #\()))
-         (format *standard-output* ";; Lambda ~A~%" (symbol-string name))
+         (format *standard-output* ";; Lambda ~A at ~A~%" (symbol-string name) orig-cs-position)
          (multiple-value-bind (offset asm-stack env kind value)
              (compile-lambda-bindings num-args package offset str-end orig-asm-stack env env name)
            (values offset
@@ -397,6 +398,7 @@
       (package-symbol-gen package)
     (multiple-value-bind (kind value offset)
         (compile-read-token package start-offset)
+      (format *standard-output* ";; compile-lambda ~A ~A ~A~%" start-offset env-start env)
       (compile-lambda-arglist package
                               (if (and (eq kind 'special)
                                        (eq value (char-code #\()))
@@ -405,7 +407,7 @@
                               str-end
                               ;; need something on the stack, make it the function pointer
                               (emit-push (emit-value orig-asm-stack 'integer (package-code-segment-position package)) 0)
-                              env-start
+                              env
                               (env-push-binding
                                (cond
                                  ;; named lambda, extract the name and bind it to the stack
@@ -676,6 +678,8 @@
 
 ;;; quote
 
+;;; todo quote, and other symbol and string values, need to be indexed. current address is what was used during compile time. (CS + CS length) may work for the string segment, then indexes are CS + (CS length + offset).
+
 (defun compile-quote (package start-offset asm-stack env-start env)
   (multiple-value-bind (kind quoted-value offset)
       (compile-read-token package start-offset)
@@ -753,7 +757,7 @@
        ;; copy first value into R0 like other returns
        (values offset
                (emit-mov (emit-pop-values asm-stack (- num 1)) 0 1)
-               env))
+               (env-pop-bindings env (- num 1))))
       ((not token-kind)
        (format *standard-output* ";; Return value ~A~%" num)
        ;; push the value and move on
@@ -762,37 +766,42 @@
 
 ;;; apply-values
 
-;; todo num-values is unavailable at compile time, making pushing the values onto the stack impossible. runtime function?
+;; todo to get rid of an explicit num-values, turn this into a runtime function/macro?
 
-#+:later (defun compile-apply-values-call (offset asm-stack env-start env)
+(defun compile-apply-values-call (num-values offset asm-stack env-start env)
   (format *standard-output* ";; Apply-Values-call~%")
-  (values offset (emit-poppers (emit-call asm-stack 11 0) num-values) env))
+  (values offset (emit-pop (emit-stack-call (emit-mvb-binders asm-stack num-values)
+                                            (* (+ 0 num-values) *REGISTER-SIZE*)))
+          env))
 
 ;; possible refactor: funcall should be equivalent to (apply-values func (values args...))
-#+:later (defun compile-apply-values (package start-offset str-end asm-stack env-start env)
-  ;; apply-values func expr
-  ;; Calls func passing any values return with VALUES as argument values.
+;; todo apply-values in the tail position should tail call func
+(defun compile-apply-values (package start-offset str-end asm-stack env-start env)
+  ;; apply-values func num-values expr
+  ;; Calls func passing num-values returned with VALUES as argument values.
   (format *standard-output* ";; Apply-Values~%")
   (multiple-value-bind (offset asm-stack env kind value)
       (repl-compile-inner package start-offset str-end asm-stack env-start env)
     (if kind (error 'malformed-error :offset start-offset))
-    (multiple-value-bind (offset asm-stack env kind value)
-        (repl-compile-inner package offset str-end (emit-push asm-stack 0) env-start env)
-      (if kind (error 'malformed-error :offset start-offset))
-      ;; eat terminator
-      (multiple-value-bind (kind value offset)
-          (compile-read-token package offset)
-        (if (not (and (eq kind 'special) (eq value (char-code #\)))))
-            (error 'invalid-token-error :offset start-offset :kind kind :value value))
-        (compile-apply-values-call offset asm-stack env-start env)))))
+    ;; read num-values
+    (multiple-value-bind (kind num-values offset)
+        (compile-read-token package offset)
+      (if (or (not (eq kind 'integer))
+              (<= num-values 0))
+          (error 'malformed-error :offset offset))
+      ;; read expr
+      (multiple-value-bind (offset asm-stack env kind value)
+          (repl-compile-inner package offset str-end (emit-push asm-stack 0) env-start env)
+        (if kind (error 'malformed-error :offset start-offset))
+        ;; eat terminator
+        (multiple-value-bind (kind value offset)
+            (compile-read-token package offset)
+          (if (not (and (eq kind 'special) (eq value (char-code #\)))))
+              (error 'invalid-token-error :offset start-offset :kind kind :value value))
+          (compile-apply-values-call num-values offset asm-stack env-start env))))))
+
 
 ;;; multiple-value-bind
-
-(defun emit-mvb-binders (asm-stack num-bindings &optional (register 1))
-  ;; values places each value in R1 on up. Store in the appropriate stack slot.
-  (if (> num-bindings 0)
-      (emit-mvb-binders (emit-push asm-stack register) (- num-bindings 1) (+ 1 register))
-      asm-stack))
 
 (defun compile-mvb-bindings (package binding-offset env &optional (num-bindings 0))
   (multiple-value-bind (kind value offset)
@@ -916,7 +925,7 @@
           (multiple-value-bind (req-offset asm-stack env kind value)
               (repl-compile-file full-path package str-end asm-stack env-start env t)
             (format *standard-output* ";; ~A required~%" (ptr-read-string path))
-            (values start-offset asm-stack env)))
+            (values start-offset (emit-reg-call asm-stack 0) env)))
         (values start-offset asm-stack env))))
 
 ;;; todo only require files once
@@ -987,8 +996,8 @@
        (compile-quote package offset asm-stack env-start env))
       ((string-equal form-str "values")
        (compile-values package offset str-end asm-stack env-start env))
-      ;; ((string-equal form-str "apply-values")
-      ;;  (compile-apply-values package offset str-end asm-stack env-start env))
+      ((string-equal form-str "apply-values")
+       (compile-apply-values package offset str-end asm-stack env-start env))
       ((string-equal form-str "multiple-value-bind")
        (compile-mvb package offset str-end asm-stack env-start env tail-call))
       ((string-equal form-str "lambda")

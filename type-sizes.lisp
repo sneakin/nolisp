@@ -6,6 +6,7 @@
 #+:repl (require "runtime/eq")
 #+:repl (require "runtime/logic")
 #+:repl (require "runtime/error")
+#+:repl (require "runtime/math")
 
 (defvar *SIZEOF_BYTE* 1)
 (defvar *SIZEOF_SHORT* 2)

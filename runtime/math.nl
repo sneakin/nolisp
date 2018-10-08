@@ -1,23 +1,29 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
+;;; Arithmetic functions
 
 (def + (a b)
-  (asm (mov 0 1)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
        (cls 7)
-       (addi 2 14)))
+       (addi 1 14)))
 
 (def - (a b)
-  (asm (mov 0 1)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
        (cls 7)
-       (subi 2 14)))
+       (subi 1 14)))
 
 (def * (a b)
-     (asm (mov 0 1)
-          (muli 2)))
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (muli 1)))
 
 (def / (a b)
-     (asm (mov 0 1)
-          (divi 2)))
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (divi 1)))
 
 (def expt (base power)
-  (asm (mov 0 1)
-       (powi 2)))
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (powi 1)))

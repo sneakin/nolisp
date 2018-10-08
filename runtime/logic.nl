@@ -11,4 +11,4 @@
       nil))
 
 (defun not (a)
-  (if a nil a))
+  (if a nil t))

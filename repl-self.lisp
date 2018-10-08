@@ -3,26 +3,26 @@
 (require "runtime")
 (require "compiler")
 
-#+:bah
 (defun package-eval (str package)
-  (with-allocation (asm-stack stack-size)
-    (with-allocation (env (stack-size))
+  (with-allocation (asm-stack 4096)
+    (with-allocation (env 4096)
       (repl-compile package str (+ str (length str)) asm-stack env env))))
 
-#+:bah
-(defun repl-eval (str &optional (buffer-size 4096))
-  (with-allocation (package (package-size))
-    (with-allocation (CS buffer-size)
-      (with-allocation (DS buffer-size)
-        (with-allocation (toplevel buffer-size)
-          (with-allocation (source-files buffer-size)
+(defun repl-eval (str &optional (segment-size 4096))
+  (with-allocation (package 64) ; (package-size)
+    (with-allocation (CS 4096)
+      (with-allocation (DS 4096)
+        (with-allocation (toplevel 4096)
+          (with-allocation (source-files 4096)
             (package-init package
                           CS segment-size
                           DS segment-size
                           toplevel segment-size
-                          src-files segment-size)
+                          source-files segment-size)
             (package-eval package str)))))
     ))
 
-#+:bah (repl-eval "(values (+ 1 2 3 4) (+ (* 2 2) (* 3 3)")
-#+:bah (asm (halt))
+(repl-eval "(values (+ 1 2 3 4) (+ (* 2 2) (* 3 3)")
+
+(read-token)
+(asm (halt))

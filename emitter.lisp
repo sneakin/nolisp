@@ -165,23 +165,23 @@
                     (* num-bindings *REGISTER-SIZE*))
       asm-stack))
 
-(defun emit-stack-alloc (asm-stack size)
-  (format *standard-output* ";; Allocating ~A bytes~%" size)
-  ;; shift SP, push SP
-  (emit-integer (emit-op asm-stack :dec 11)
-                (align-bytes size)))
-
 (defun emit-mov (asm-stack dest src)
   (emit-op asm-stack :mov dest src))
 
+(defun emit-stack-alloc (asm-stack size)
+  (format *standard-output* ";; stack-alloc ~A bytes~%" size)
+  ;; shift SP
+  (emit-integer (emit-op asm-stack :dec 11)
+                (align-bytes size)))
+
 (defun emit-stack-alloc-value (asm-stack size)
-  (format *standard-output* ";; Allocating ~A bytes~%" size)
-  ;; shift SP, push SP
+  (format *standard-output* ";; stack-alloc-value ~A bytes~%" size)
+  ;; shift SP, mov SP to return value
   (emit-mov (emit-stack-alloc asm-stack size)
             0 11))
 
 (defun emit-stack-alloc-binding (asm-stack size)
-  (format *standard-output* ";; Allocating ~A bytes~%" size)
+  (format *standard-output* ";; stack-alloc-binding ~A bytes~%" size)
   ;; shift SP, push SP
   (emit-push (emit-stack-alloc asm-stack size)
              11))
@@ -297,9 +297,16 @@
 
 (defun emit-tailcall (asm-stack reg data-offset args callers-bindings)
   ;; pop values, pop caller's values moving stack frame over caller's, call
+  (format *standard-output* ";; tailcall R~A+~A, ~A args~%" reg data-offset args)
   (let ((stack-size (/ callers-bindings *REGISTER-SIZE*)))
     (emit-call-jump (emit-move-stack asm-stack args (+ args stack-size) args)
                     reg data-offset)))
+
+(defun emit-mvb-binders (asm-stack num-bindings &optional (register 1))
+  ;; values places each value in R1 on up. Store in the appropriate stack slot.
+  (if (> num-bindings 0)
+      (emit-mvb-binders (emit-push asm-stack register) (- num-bindings 1) (+ 1 register))
+      asm-stack))
 
 (defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
   ;; comments are reverse from how the code is emitted

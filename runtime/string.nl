@@ -1,11 +1,15 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "runtime/memory")
 (require "runtime/sequence")
+(require "runtime/null")
+(require "runtime/math")
 
 (defun length (str &optional (n 0))
-  (if (eq (ptr-read-byte str) 0)
-      n
-      (length (+ str 1) (+ n 1))))
+  (if str
+      (if (eq (ptr-read-byte str) 0)
+          n
+          (length (+ str 1) (+ n 1)))))
 
 (defun string-aref (str n)
   (ptr-read-byte (+ str n)))

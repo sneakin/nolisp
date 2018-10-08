@@ -41,7 +41,7 @@
 
 (defun env-symbol-position (sym env-start env &optional (n 0))
   "Returns the binding slot index of SYM in the environment defined by ENV-START and ENV."
-  (if (> env env-start)
+  (if (>= env env-start)
       (if (eq (ptr-read-ulong (- env *REGISTER-SIZE*)) sym)
           n
           (env-symbol-position sym env-start (- env *REGISTER-SIZE*) (+ 1 n)))
@@ -100,7 +100,7 @@
 (defun env-dump (env-start env &optional (stream *standard-output*) (n 0))
   (if (= n 0)
       (format stream "~%Env: ~A to ~A~%" env-start env))
-  (if (<= env-start env)
+  (if (< env-start env)
       (progn
         (format stream "~A ~A = ~A~%" (ptr-read-ulong env-start) (env-name env-start) n)
         (env-dump (+ env-start *REGISTER-SIZE*) env stream (+ n 1)))

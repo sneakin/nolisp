@@ -1,7 +1,9 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
 (defun float (n)
-  (asm (convi 1 0 4)))
+  (asm (load 0 0 11) 4
+       (convi 0 0 4)))
 
 (defun ceiling (n)
-  (asm (ceilf 1 0)))
+  (asm (load 0 0 11) 4
+       (ceilf 0 0)))
