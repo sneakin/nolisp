@@ -20,24 +20,28 @@
 
 (defun env-pop-bindings (env num)
   "Removes NUM bindings from ENV returning the new ENV stack address."
-  (format *standard-output* ";; Unbinding ~A slots~%" num)
   (if (> num 0)
-      (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1))
+      (progn
+        (format *standard-output* ";; Unbinding ~A slots~%" num)
+        (ptr-write-long 0 env)
+        (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1)))
       env))
 
 (defun env-push-alloc (bytes env)
   "Adds BYTES worth of space to the ENV stack returning the new address."
-  (format *standard-output* ";; Binding ~A bytes~%" bytes)
-  (+ env (align-bytes bytes) *REGISTER-SIZE*))
+  (let ((bytes (+ (align-bytes bytes *REGISTER-SIZE*))))
+    (format *standard-output* ";; Binding ~A bytes~%" bytes)
+    (ptr-zero env bytes)
+    (+ env bytes)))
 
 (defun env-push-alloc-binding (name bytes env)
   "Adds a named binding of BYTES to ENV."
-  (env-push-binding name (env-push-alloc env bytes)))
+  (env-push-binding name (env-push-alloc bytes env)))
 
 (defun env-pop-alloc (bytes env)
   "Removes a binding of allocated bytes."
-  (format *standard-output* ";; Unbinding ~A bytes~%" bytes)
-  (- (env-pop-bindings env 1) (align-bytes bytes) *REGISTER-SIZE*))
+  (format *standard-output* ";; Unbinding ~A bytes~%" (align-bytes bytes))
+  (- (env-pop-bindings env 1) (align-bytes (+ bytes *REGISTER-SIZE*))))
 
 (defun env-symbol-position (sym env-start env &optional (n 0))
   "Returns the binding slot index of SYM in the environment defined by ENV-START and ENV."

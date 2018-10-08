@@ -18,15 +18,19 @@
        ;; return (values (+ ptr offset) value)
        (inc 0) 4))
 
-(with-allocation (b 64)
-  (with-allocation (a 64)
-    (seq-write a 60 456)
-    (seq-write a 0 123)
-    ;; zero registers
-    (values 0 0 0 0 0 0 0)
-    (values a
-            (seq-read a 0)
-            (seq-read a 4)
-            (seq-read a 60))))
+(with-allocation (a 14)
+  (with-allocation (b 64)
+    (with-allocation (c 31)
+      (seq-write a 11 456)
+      (seq-write a 0 123)
+      (seq-write b 0 789)
+      (seq-write c 0 101)
+      ;; zero registers
+      (values 0 0 0 0 0 0 0)
+      (values a b c
+              (seq-read a 0)
+              (seq-read a 11)
+              (seq-read b 0)
+              (seq-read c 0)))))
 
 (asm (halt))
