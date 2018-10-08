@@ -24,7 +24,8 @@
   (ptr-write-long c ptr))
 
 (defun ptr-write-byte (c ptr)
-  (ptr-write-long (logior (ptr-read-long ptr) (logand c #xFF)) ptr))
+  (ptr-write-long (logior (ptr-read-long ptr) (logand c #xFF)) ptr)
+  (+ ptr 1))
 
 (defun ptr-read-float (ptr)
   (ptr-read-long ptr))

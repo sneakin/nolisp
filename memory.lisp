@@ -63,12 +63,18 @@
   (ptr-write-byte (mask-ulong 0 n) ptr)
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
 
+(defun make-ulong (a b c d)
+  (logior a
+          (ash b 8)
+          (ash c 16)
+          (ash d 24)))
+
 #+:sbcl
 (defun ptr-read-ulong (ptr)
-  (logior (ptr-read-byte ptr)
-          (ash (ptr-read-byte (+ ptr 1)) 8)
-          (ash (ptr-read-byte (+ ptr 2)) 16)
-          (ash (ptr-read-byte (+ ptr 3)) 24)))
+  (make-ulong (ptr-read-byte ptr)
+              (ptr-read-byte (+ ptr 1))
+              (ptr-read-byte (+ ptr 2))
+              (ptr-read-byte (+ ptr 3))))
 
 #+:sbcl
 (defun ptr-read-long (ptr)
@@ -167,16 +173,22 @@
 (defun ptr-read-file (path offset)
   (error 'not-implemented-error))
 
-(defun ptr-zero (offset count)
+(defun ptr-write-quad (value offset)
+  (ptr-write-long (make-ulong value value value value) offset))
+
+(defun ptr-set (offset count &optional (value 0))
   (if (> count 4)
       (progn
-        (ptr-write-long 0 offset)
-        (ptr-zero (+ offset *SIZEOF_LONG*) (- count *SIZEOF_LONG*)))
+        (ptr-write-quad value offset)
+        (ptr-set (+ offset *SIZEOF_LONG*) (- count *SIZEOF_LONG*) value))
       (if (> count 0)
           (progn
-            (ptr-write-byte 0 offset)
-            (ptr-zero (+ offset 1) (- count 1)))
+            (ptr-write-byte value offset)
+            (ptr-set (+ offset 1) (- count 1) value))
           offset)))
+
+(defun ptr-zero (offset count)
+  (ptr-set offset count 0))
 
 #-:repl
 (defun ptr-write (value ptr)
