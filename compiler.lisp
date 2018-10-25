@@ -688,7 +688,7 @@
             (compile-read-token package offset)
           (format *standard-output* ";; Quote: ~A~%" (symbol-string quoted-value))
           (if (and (eq kind 'special) (eq value (char-code #\))))
-              (values offset (emit-value asm-stack 'integer quoted-value) env)
+              (values offset (emit-symbol-value asm-stack quoted-value package) env)
               (error 'malformed-error :offset start-offset)))
         (error 'not-implemented-error :feature 'quote :offset start-offset))))
 
@@ -698,7 +698,7 @@
     (if (eq kind 'symbol)
         (progn
           (format *standard-output* ";; Quote: ~A~%" (symbol-string quoted-value))
-          (values offset (emit-value asm-stack 'integer quoted-value) env))
+          (values offset (emit-symbol-value asm-stack quoted-value package) env))
         (error 'malformed-error :offset start-offset))))
 
 ;;; asm
@@ -711,6 +711,7 @@
       (compile-read-token package start-offset)
     (cond
       ((and (eq kind 'special) (eq value (char-code #\))))
+       (format *standard-output* ";; asm op ~A ~A ~A ~A~%" (symbol-string op) a b c)
        (compile-asm package offset
                     (emit-op asm-stack (symbol-string op) a b c)
                     env-start env))
@@ -1115,7 +1116,7 @@
       ((eq kind 'float)
        (values offset (emit-value asm-stack 'float value) env))
       ((eq kind 'string)
-       (values offset (emit-value asm-stack 'integer value) env))
+       (values offset (emit-string-value asm-stack value package) env))
       ((eq kind 'character)
        (values offset (emit-value asm-stack 'integer value) env))
       ((eq kind 'condition)

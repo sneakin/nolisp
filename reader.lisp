@@ -149,7 +149,7 @@
     (cond
       ((eq c terminator)
        (ptr-write-byte 0 output)
-       (values 'string output-start (+ 1 str) (+ 1 output)))
+       (values 'string (or output-start output) (+ 1 str) (+ 1 output)))
       ((eq c (char-code #\\))
        (ptr-write-byte (char-code (unescape-char (ptr-read-byte (+ 1 str)))) output)
        (read-string (+ str 2) (+ output 1) terminator (or output-start output)))

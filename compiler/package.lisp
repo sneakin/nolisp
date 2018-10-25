@@ -103,6 +103,7 @@
                        top-size
                        toplevel)
     (package-define compiler (package-intern compiler *INIT-FUNC*))
+    (package-define compiler (package-intern compiler "*STRING-SEGMENT*"))
     (byte-buffer-init (package-source-files compiler)
                       src-files
                       sf-size)

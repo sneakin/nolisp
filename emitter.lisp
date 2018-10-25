@@ -74,6 +74,25 @@
       (emit-float (emit-op asm-stack :load reg condition 15) value)
       (emit-integer (emit-op asm-stack :load reg condition 15) value)))
 
+(defun emit-string-segment-position (asm-stack package)
+  (let* ((string-segment-sym (package-intern package "*STRING-SEGMENT*"))
+         (asm-stack (emit-lookup-global asm-stack string-segment-sym (package-symbols package))))
+    (if asm-stack
+        asm-stack
+        (error 'undefined-variable-error :name string-segment-sym))))
+
+(defun emit-string-value (asm-stack ptr package)
+  ;; need to emit code to adjust the string's offset into the string segment
+  (emit-op
+   (emit-op (emit-string-segment-position
+             (emit-value asm-stack 'integer (- ptr (package-string-segment-data package)) 1)
+             package)
+            :cls)
+   :addi 1 14))
+
+(defun emit-symbol-value (asm-stack symbol package)
+  (emit-string-value asm-stack symbol package))
+
 (defun emit-load-stack-value (asm-stack offset &optional (register 0))
   (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
   )
@@ -308,24 +327,37 @@
       (emit-mvb-binders (emit-push asm-stack register) (- num-bindings 1) (+ 1 register))
       asm-stack))
 
-(defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init)
+(defun emit-init (asm-stack code-segment data-segment toplevel-start toplevel init init-sym string-segment-sym)
   ;; comments are reverse from how the code is emitted
-  ;; perform a reset
-  (emit-op
-   ;; call init
-   (emit-reg-call
-    ;; bind init
-    (emit-store-data-value
-     (emit-integer
-      ;; setup DS
-      (emit-op
-       (emit-integer
-        ;; setup CS
-        (emit-op asm-stack :load 10 0 15)
-        code-segment)
-       :load 9 0 15)
-      data-segment)
-     (env-data-position init toplevel-start toplevel)
-     )
-    0)
-   :reset))
+  (let ((string-segment-jump (emit-integer
+                              (emit-op
+                               ;; bind init
+                               (emit-store-data-value
+                                ;; setup DS
+                                (emit-integer
+                                 (emit-op
+                                  ;; setup CS
+                                  (emit-integer
+                                   (emit-op asm-stack :load 10 0 15)
+                                   code-segment)
+                                  :load 9 0 15)
+                                 data-segment)
+                                (env-data-position init-sym toplevel-start toplevel)
+                                )
+                               :load 1 0 15)
+                              #xFFFFFFFF)))
+    (values
+     ;; perform a reset
+     (emit-op
+      ;; call init
+      (emit-reg-call
+       ;; bind *string-segment* with a temporary value
+       (emit-store-data-value
+        string-segment-jump
+        (env-data-position string-segment-sym toplevel-start toplevel)
+        1)    
+       0)
+      :halt)
+     (- string-segment-jump *SIZEOF_LONG*))
+    ))
+
