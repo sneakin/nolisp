@@ -1,4 +1,5 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
+;;; Functions to load and reload REPL including module path resolution and loading for SBCL.
 
 (define-condition repl-load-error (simple-error)
   ((module :initarg :module :initform nil)
@@ -52,4 +53,3 @@
 
 (eval-when (:load-toplevel :execute)
   (repl-load))
-
