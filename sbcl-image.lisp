@@ -1,3 +1,6 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+;;; Generate an executable image for the compiler.
+
 (load "sbcl.lisp")
 
 #+:WIN32 (defconstant EXECUTABLE-EXT ".exe")
@@ -55,7 +58,7 @@
 
 (defun repl-save-image (path)
   "Saves the Lisp core image to PATH using REPL-COMPILER-TOPLEVEL as the init function."
-  (save-lisp-and-die path :toplevel #'repl-compiler-toplevel :executable t))
+  (save-lisp-and-die path :toplevel #'repl-compiler-toplevel :executable t :purify t))
 
 (eval-when (:load-toplevel :execute)
   (format *error-output* "Saving image...~%")
