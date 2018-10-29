@@ -1,8 +1,8 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(in-package :repl)
-
 (require "isa")
+
+(in-package :repl)
 
 (define-isa bacaw-isa
     (:NOP (0 0))

@@ -73,6 +73,7 @@
            :write-to-file
            :compile-to-file
            :repl-file
+           :disassmble-asm
            ))
 
 #+:sbcl

@@ -40,7 +40,7 @@
       (gen-isa-make-ops prefix (rest ops) (cons (apply #'gen-isa-op-encoder (first ops))
                                          acc))
       `(,(concat-symbol prefix '-make-op) (op &optional a b c)
-         ,acc)
+         ',acc)
       ))
 
 (defun gen-isa-op-nibble-tests (nibbles &optional acc (n 0))
