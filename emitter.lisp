@@ -14,12 +14,12 @@
 
 (defun make-op (op &optional a b c)
   (cond
-    ((eq op :NOP) (make-short 0 0 0 0))
-    ((eq op :NOT) (make-short 0 1 0 0))
-    ((eq op :OR) (make-short 0 2 0 0))
-    ((eq op :XOR) (make-short 0 3 0 0))
-    ((eq op :AND) (make-short 0 4 0 0))
-    ((eq op :BSL) (make-short 0 5 0 0))
+    ((eq op :NOP) (make-short 0 0 a b))
+    ((eq op :NOT) (make-short 0 1 a 0))
+    ((eq op :OR) (make-short 0 2 a b))
+    ((eq op :XOR) (make-short 0 3 a b))
+    ((eq op :AND) (make-short 0 4 a b))
+    ((eq op :BSL) (make-short 0 5 a b))
     ((eq op :INT) (make-short 0 7 a b))
     ((eq op :HALT) (make-short 0 8 a b))
     ((eq op :NEG) (make-short 0 9 a b))
@@ -74,25 +74,6 @@
       (emit-float (emit-op asm-stack :load reg condition 15) value)
       (emit-integer (emit-op asm-stack :load reg condition 15) value)))
 
-(defun emit-string-segment-position (asm-stack package)
-  (let* ((string-segment-sym (package-intern package "*STRING-SEGMENT*"))
-         (asm-stack (emit-lookup-global asm-stack string-segment-sym (package-symbols package))))
-    (if asm-stack
-        asm-stack
-        (error 'undefined-variable-error :name string-segment-sym))))
-
-(defun emit-string-value (asm-stack ptr package)
-  ;; need to emit code to adjust the string's offset into the string segment
-  (emit-op
-   (emit-op (emit-string-segment-position
-             (emit-value asm-stack 'integer (- ptr (package-string-segment-data package)) 1)
-             package)
-            :cls)
-   :addi 1 14))
-
-(defun emit-symbol-value (asm-stack symbol package)
-  (emit-string-value asm-stack symbol package))
-
 (defun emit-load-stack-value (asm-stack offset &optional (register 0))
   (emit-integer (emit-op asm-stack :load register 0 11) (* *REGISTER-SIZE* offset))
   )
@@ -111,7 +92,7 @@
 
 (defun emit-lookup-call (asm-stack symbol symbol-index)
   ;; load the symbol value into R1 and the toplevel lookup from the top of the stack
-  ;; todo need to lookup the lookup function since lambad's set env to env-start
+  ;; todo need to lookup the lookup function since lambda's set env to env-start
   (format *standard-output* ";;  globally~%")
   (emit-integer (emit-op (emit-integer (emit-op (emit-integer (emit-op asm-stack 'load 1 0 15)
                                                               symbol)
@@ -146,16 +127,32 @@
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
     (if new-asm
         new-asm
-        (progn
-          (env-dump env-start env)
-          (env-dump (symbol-index-buffer toplevel) (symbol-index-next-offset toplevel))
-          (error 'undefined-variable-error :name symbol)))))
+        (error 'undefined-variable-error :name symbol))))
 
 (defun emit-lookup-or-nil (asm-stack symbol env-start env toplevel)
   (let ((new-asm (emit-lookup-inner asm-stack symbol env-start env toplevel)))
     (if new-asm
         new-asm
         (emit-value asm-stack 'integer 0))))
+
+(defun emit-string-segment-position (asm-stack package)
+  (let* ((string-segment-sym (package-intern package "*STRING-SEGMENT*"))
+         (asm-stack (emit-lookup-global asm-stack string-segment-sym (package-symbols package))))
+    (if asm-stack
+        asm-stack
+        (error 'undefined-variable-error :name string-segment-sym))))
+
+(defun emit-string-value (asm-stack ptr package)
+  ;; need to emit code to adjust the string's offset into the string segment
+  (emit-op
+   (emit-op (emit-string-segment-position
+             (emit-value asm-stack 'integer (- ptr (package-string-segment-data package)) 1)
+             package)
+            :cls)
+   :addi 1 14))
+
+(defun emit-symbol-value (asm-stack symbol package)
+  (emit-string-value asm-stack symbol package))
 
 (defun emit-toplevel-store-reg (asm-stack name toplevel &optional (reg 0))
   (emit-store-data-value  asm-stack
@@ -246,6 +243,7 @@
                 0))
 
 (defun emit-reg-jump (asm-stack reg)
+  (format *standard-output* ";; reg-jump R~A~%" reg)
   (emit-op (emit-op (emit-op (if (> reg 0)
                                  (emit-op asm-stack :mov reg 0)
                                  asm-stack)
@@ -286,39 +284,31 @@
 
 (defun emit-copy-stack-down (asm-stack src-offset dest-offset count)
   "Copies a COUNT values from the SRC offset to the DEST offset going from down the stack."
-  (if (> count 0)
-      (emit-copy-stack-down (emit-copy-stack-value asm-stack
-                                                   (- src-offset 1)
-                                                   (- dest-offset 1))
+  (if (>= count 0)
+      (emit-copy-stack-down (emit-copy-stack-value asm-stack src-offset dest-offset)
                             (- src-offset 1)
                             (- dest-offset 1)
                             (- count 1))
       asm-stack))
 
-(defun emit-move-stack (asm-stack src-offset dest-offset count)
-  (emit-poppers (emit-copy-stack-down (emit-push (emit-load-stack-value asm-stack src-offset) 0)
-                                      (+ 1 src-offset)
-                                      (+ 1 dest-offset)
-                                      (+ 1 count))
-                (- (+ 1 dest-offset) (+ 1 count))))
+(defun emit-move-stack (asm-stack return-offset src-offset dest-offset count)
+  ;; update SP
+  (emit-poppers
+   ;; move the arguments up the stack
+   (emit-copy-stack-down
+    ;; save the return address
+    (emit-push (emit-load-stack-value asm-stack return-offset) 0)
+    src-offset dest-offset count)
+   (-  dest-offset src-offset)))
 
-(defun emit-copy-values-down (asm-stack src dest count &optional (n (- count 1)))
-  "Copies a COUNT values from the SRC pointer to the DEST pointer going from the end of the memory region."
-  (if (>= n 0)
-      (emit-copy-values-down (emit-copy-data-value asm-stack
-                                                   (+ src n)
-                                                   (+ dest n))
-                             src
-                             dest
-                             count
-                             (- n 1))
-      asm-stack))
-
-(defun emit-tailcall (asm-stack reg data-offset args callers-bindings)
-  ;; pop values, pop caller's values moving stack frame over caller's, call
-  (format *standard-output* ";; tailcall R~A+~A, ~A args~%" reg data-offset args)
+(defun emit-tailcall (asm-stack reg data-offset num-args return-offset callers-bindings)
+  ;; Copies the call's arguments and the return address at the return-offset up the stack.
+  ;; The address at the return-offset is in bytes. Callers-bindings are in number of bindings.
+  ;; todo return-offset is in bytes: everything else is number of bindings
+  (format *standard-output* ";; tailcall R~A+~A, ~A args, return at ~A, ~A bindings~%" reg data-offset num-args return-offset (/ callers-bindings *REGISTER-SIZE*))
   (let ((stack-size (/ callers-bindings *REGISTER-SIZE*)))
-    (emit-call-jump (emit-move-stack asm-stack args (+ args stack-size) args)
+    ;; pop values, pop caller's values moving stack frame over caller's, call
+    (emit-call-jump (emit-move-stack asm-stack (/ return-offset *REGISTER-SIZE*) num-args (+ num-args stack-size) num-args)
                     reg data-offset)))
 
 (defun emit-mvb-binders (asm-stack num-bindings &optional (register 1))

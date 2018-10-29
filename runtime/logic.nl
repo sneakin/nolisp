@@ -2,6 +2,9 @@
 
 (require "runtime/truth")
 
+(defun not (a)
+  (if a nil t))
+
 (defun or (a b)
   (if a a b))
 
@@ -9,6 +12,3 @@
   (if a
       (if b b nil)
       nil))
-
-(defun not (a)
-  (if a nil t))

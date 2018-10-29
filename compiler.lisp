@@ -23,8 +23,10 @@
 
 (in-package :repl)
 
-#+:repl (defun repl-compile-inner (package str str-end asm-stack env-start env &optional tail-call))
+#+:repl (defun repl-compile-inner (package str str-end asm-stack env-start env &optional tail-call return-offset))
 #+:repl (defun repl-compile-file (path package str asm-stack env-start env &optional in-require))
+
+(defvar *allow-tail-calls* t)
 
 (defun compile-read-token (package offset)
   (multiple-value-bind (kind value offset token-offset)
@@ -51,12 +53,10 @@
           (emit-funcall asm-stack reg (* *REGISTER-SIZE* data-offset) args)
           (env-pop-bindings env args)))
 
-;; todo need to keep the return address of the caller's frame.
-
-(defun compile-funcall-tail (package str asm-stack env-start env reg data-offset args)
+(defun compile-funcall-tail (package str asm-stack env-start env reg data-offset args return-offset)
   (let ((post-env (env-pop-bindings env args)))
     (values str
-            (emit-tailcall asm-stack reg (* *REGISTER-SIZE* data-offset) args (- post-env env-start))
+            (emit-tailcall asm-stack reg (* *REGISTER-SIZE* data-offset) args (+ (* args *REGISTER-SIZE*) return-offset) (- post-env env-start))
             post-env))
 )
 
@@ -79,28 +79,28 @@
             (values 9 data-pos)
             nil))))
 
-(defun compile-funcall-it (package str asm-stack env-start env func-name args tail-call)
+(defun compile-funcall-it (package str asm-stack env-start env func-name args tail-call return-offset)
   (multiple-value-bind (reg data-offset)
       (compile-funcall-resolve package env-start env func-name args)
     (if (not reg) (error 'undefined-function-error :offset str :name func-name :args args))
     (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
     (if tail-call
-        (compile-funcall-tail package str asm-stack env-start env reg data-offset args)
+        (compile-funcall-tail package str asm-stack env-start env reg data-offset args return-offset)
         (compile-funcall-push package str asm-stack env-start env reg data-offset args))))
 
-(defun compile-call-argument (package str str-end asm-stack env-start env func-name arg-num tail-call)
+(defun compile-call-argument (package str str-end asm-stack env-start env func-name arg-num tail-call return-offset)
   (format *standard-output* ";; Argument ~A ~A~%" arg-num tail-call)
   ;; compile the current argument
   (multiple-value-bind (offset new-asm-stack new-env token-kind token-value)
       (repl-compile-inner package str str-end asm-stack env-start env)
     ;; make the call when an #\) is read
     (if (and (eq token-kind 'special) (eq token-value (char-code #\))))
-        (compile-funcall-it package offset new-asm-stack env-start new-env func-name arg-num tail-call)        
+        (compile-funcall-it package offset new-asm-stack env-start new-env func-name arg-num tail-call return-offset)
         ;; push result onto stack and move to the next argument
-        (compile-call-argument package offset str-end (emit-push new-asm-stack 0) env-start (env-push-binding 0 new-env) func-name (+ 1 arg-num) tail-call))))
+        (compile-call-argument package offset str-end (emit-push new-asm-stack 0) env-start (env-push-binding 0 new-env) func-name (+ 1 arg-num) tail-call return-offset))))
 
-(defun compile-funcall (func-name package str str-end asm-stack env-start env tail-call)
-  (compile-call-argument package str str-end asm-stack env-start env func-name 0 tail-call))
+(defun compile-funcall (func-name package str str-end asm-stack env-start env tail-call return-offset)
+  (compile-call-argument package str str-end asm-stack env-start env func-name 0 tail-call return-offset))
 
 ;;; IF
 
@@ -123,11 +123,11 @@
         (compile-if-fixer if-offset then-offset package offset asm-stack env-start env)
         (error 'invalid-token-error :offset start-offset :kind kind :value value))))
 
-(defun compile-if-else (if-offset then-offset package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-if-else (if-offset then-offset package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; compile the ELSE form
   (format *standard-output* ";; IF else ~A~%" tail-call)
   (multiple-value-bind (offset asm-stack env kind value)
-      (repl-compile-inner package start-offset str-end asm-stack env-start env tail-call)
+      (repl-compile-inner package start-offset str-end asm-stack env-start env tail-call return-offset)
     ;; no form, then done
     (if (and (eq kind 'special) (eq value (char-code #\))))
         (compile-if-fixer if-offset then-offset package offset (emit-value asm-stack 'integer 0) env-start env)
@@ -136,11 +136,11 @@
             (error 'invalid-token-error :offset start-offset :kind kind :value value)
             (compile-if-closing if-offset then-offset package offset asm-stack env-start env)))))
 
-(defun compile-if-then (if-offset package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-if-then (if-offset package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; compile the THEN form
   (format *standard-output* ";; IF then~%")
   (multiple-value-bind (offset asm-stack env kind value)
-      (repl-compile-inner package start-offset str-end asm-stack env-start env tail-call)
+      (repl-compile-inner package start-offset str-end asm-stack env-start env tail-call return-offset)
     ;; no form, emit zero, then done
     (if (and (eq kind 'special) (eq value (char-code #\))))
         (let ((asm-stack (emit-jump (emit-value asm-stack 'integer 0) #xFFFFFFFF)))
@@ -162,9 +162,10 @@
                              (emit-jump asm-stack #xFFFFFFFF) 
                              env-start
                              env
-                             tail-call)))))
+                             tail-call
+                             return-offset)))))
 
-(defun compile-if (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-if (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; compile the test
   (format *standard-output* ";; IF condition ~A~%" (if tail-call "tail" ""))
   (multiple-value-bind (offset asm-stack env kind value)
@@ -175,7 +176,7 @@
                      offset
                      str-end
                      (emit-jump (emit-zero-cmp asm-stack 0 1) #xFFFFFFFF #x1)
-                     env-start env tail-call)))
+                     env-start env tail-call return-offset)))
 
 ;;; progn
 
@@ -186,35 +187,35 @@
         (compile-read-token package call-end)
       (and (eq kind 'special) (eq value (char-code #\)))))))
 
-(defun compile-progn (package offset str-end asm-stack env-start env tail-call &optional (n 0))
+(defun compile-progn (package offset str-end asm-stack env-start env tail-call return-offset &optional (n 0))
   (format *standard-output* ";; expr ~A ~A~%" n (if tail-call "tail" ""))
   (multiple-value-bind (offset asm-stack env kind value)
-      (repl-compile-inner package offset str-end asm-stack env-start env (if tail-call (tail-call? package offset)))
+      (repl-compile-inner package offset str-end asm-stack env-start env (if tail-call (tail-call? package offset)) return-offset)
     (if (and (eq kind 'special) (eq value (char-code #\))))
         (values offset asm-stack env)
-        (compile-progn package offset str-end asm-stack env-start env tail-call (+ 1 n)))))
+        (compile-progn package offset str-end asm-stack env-start env tail-call return-offset (+ 1 n)))))
 
 ;;; Forms
 
-(defun compile-body (num-bindings package offset str-end asm-stack env-start env tail-call &optional (n 0))
+(defun compile-body (num-bindings package offset str-end asm-stack env-start env tail-call return-offset)
   (multiple-value-bind (offset asm-stack env kind value)
-      (compile-progn package offset str-end asm-stack env-start env tail-call)
+      (compile-progn package offset str-end asm-stack env-start env tail-call (+ (* num-bindings *REGISTER-SIZE*) (or return-offset 0)))
     (format *standard-output* ";; body closing ~A~%" tail-call)
     (values offset
             (emit-poppers asm-stack num-bindings)
             (env-pop-bindings env num-bindings))))
 
 ;;; cond
-#+:repl (defun compile-cond-case (package start-offset str-end asm-stack env-start env tail-call))
+#+:repl (defun compile-cond-case (package start-offset str-end asm-stack env-start env tail-call return-offset))
 
-(defun compile-cond-case-body (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-cond-case-body (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; jump past body if 0
   (let ((body-start (emit-fake-jump (emit-zero-cmp asm-stack 0 1) #xFFFFFFFF #x1)))
     ;; compile body
     (multiple-value-bind (offset asm-stack env)
         (compile-body 0 package start-offset str-end
                       body-start
-                      env-start env tail-call)
+                      env-start env tail-call return-offset)
       (let ((body-end (emit-fake-jump asm-stack #xFFFFFFFF)))
         ;; fix the jump over the body
         (emit-fixed-jump body-start (- body-end body-start))
@@ -222,17 +223,17 @@
         ;;(values offset asm-stack env)
         ;; jump to end of cond block, but first compile the other cases
         (multiple-value-bind (offset asm-stack env)
-            (compile-cond-case package offset str-end body-end env-start env tail-call)
+            (compile-cond-case package offset str-end body-end env-start env tail-call return-offset)
           (emit-fixed-jump body-end (- asm-stack body-end))
           (values offset asm-stack env))))))
 
-(defun compile-cond-case-test (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-cond-case-test (package start-offset str-end asm-stack env-start env tail-call return-offset)
   (multiple-value-bind (offset asm-stack env kind value)
       (repl-compile-inner package start-offset str-end asm-stack env-start env)
     (if kind (error 'invalid-token-error :offset start-offset :kind kind :value value))
-    (compile-cond-case-body package offset str-end asm-stack env-start env tail-call)))
+    (compile-cond-case-body package offset str-end asm-stack env-start env tail-call return-offset)))
 
-(defun compile-cond-case (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-cond-case (package start-offset str-end asm-stack env-start env tail-call return-offset)
   (format *standard-output* ";; cond-case ~A~%" (ptr-read-string start-offset 10))
   ;; compile test expression
   (multiple-value-bind (kind value offset)
@@ -240,13 +241,13 @@
     (format *standard-output* ";; cond-case token ~A ~A~%" kind value)
     (cond
       ((and (eq kind 'special) (eq value (char-code #\()))
-       (compile-cond-case-test package offset str-end asm-stack env-start env tail-call))
+       (compile-cond-case-test package offset str-end asm-stack env-start env tail-call return-offset))
       ((and (eq kind 'special) (eq value (char-code #\))))
        (values offset asm-stack env))
       (t (error 'malformed-error :offset start-offset)))))
 
-(defun compile-cond (package start-offset str-end asm-stack env-start env tail-call)
-  (compile-cond-case package start-offset str-end asm-stack env-start env tail-call))
+(defun compile-cond (package start-offset str-end asm-stack env-start env tail-call return-offset)
+  (compile-cond-case package start-offset str-end asm-stack env-start env tail-call return-offset))
 
 
 ;;; LET
@@ -275,7 +276,7 @@
     ;; compile the initializer
     (compile-let-binding-initializer num name package offset str-end asm-stack env-start env)))
 
-(defun compile-let-bindings (num package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-let-bindings (num package start-offset str-end asm-stack env-start env tail-call return-offset)
   (multiple-value-bind (kind value offset)
       (compile-read-token package start-offset)
     (cond
@@ -283,17 +284,17 @@
       ((and (eq kind 'special) (eq value (char-code #\()))
        (multiple-value-bind (offset asm-stack env)
            (compile-let-binding num package offset str-end asm-stack env-start env)
-         (compile-let-bindings (+ 1 num) package offset str-end asm-stack env-start env tail-call))
+         (compile-let-bindings (+ 1 num) package offset str-end asm-stack env-start env tail-call return-offset))
        )
       ((and (eq kind 'special) (eq value (char-code #\))))
        (format *standard-output* ";; Let body, ~A bindings~%" num)
-       (compile-body num package offset str-end asm-stack env-start env tail-call)
+       (compile-body num package offset str-end asm-stack env-start env tail-call return-offset)
        )
       (t (error 'malformed-let-error :offset start-offset)))
     )
   )
 
-(defun compile-let (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-let (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; for each binding, compile and push the value, then push the name's symbol value to env
   ;; compile the body
   ;; clean up the stack
@@ -301,7 +302,7 @@
   (multiple-value-bind (kind value offset)
       (compile-read-token package start-offset)
     (if (and (eq kind 'special) (eq value (char-code #\()))
-        (compile-let-bindings 0 package offset str-end asm-stack env-start env tail-call)
+        (compile-let-bindings 0 package offset str-end asm-stack env-start env tail-call return-offset)
         (error 'malformed-let-error :offset start-offset))))
 
 ;;; toplevel
@@ -344,7 +345,8 @@
                      orig-asm-stack
                      env-start
                      (env-push-binding 0 env) ;; account for the return IP
-                     t)
+                     *allow-tail-calls*
+                     0)
     (format *standard-output* ";; lambda closing ~A~%" (symbol-string func-name))
     ;; (if func-name (setq num-bindings (+ 1 num-bindings)))
     (let* ((asm-stack (emit-return asm-stack num-bindings))
@@ -678,8 +680,6 @@
 
 ;;; quote
 
-;;; todo quote, and other symbol and string values, need to be indexed. current address is what was used during compile time. (CS + CS length) may work for the string segment, then indexes are CS + (CS length + offset).
-
 (defun compile-quote (package start-offset asm-stack env-start env)
   (multiple-value-bind (kind quoted-value offset)
       (compile-read-token package start-offset)
@@ -749,7 +749,7 @@
 (defun compile-values (package start-offset str-end asm-stack env-start env &optional (num 1))
   ;; returns from the caller, keeping arguments in registers
   ;; todo pass register to repl-compile-inner so the mov can be skipped
-  ;; todo how to signal that any following forms don't matter? ie: the double ret, if-then's inc?
+  ;; todo how to signal that any following forms don't matter? ie: the double ret, if-then's inc? Warn if VALUES is not in a tail position?
   (multiple-value-bind (offset asm-stack env token-kind token-value)
       (repl-compile-inner package start-offset str-end asm-stack env-start env)
     (cond
@@ -815,7 +815,7 @@
       (t (error 'malformed-error :offset binding-offset))))
   )
 
-(defun compile-mvb-expr (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-mvb-expr (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; skip bindings
   (let ((binding-end (compile-scan-list package start-offset)))
     (multiple-value-bind (offset asm-stack env kind)
@@ -827,10 +827,10 @@
           (compile-mvb-bindings package start-offset env)
         (format *standard-output* ";; MVB bindings: ~A~%" num-bindings)
         ;; the body
-        (compile-body num-bindings package offset str-end (emit-mvb-binders asm-stack num-bindings) env-start env tail-call))
+        (compile-body num-bindings package offset str-end (emit-mvb-binders asm-stack num-bindings) env-start env tail-call return-offset))
       )))
 
-(defun compile-mvb (package start-offset str-end asm-stack env-start env tail-call &optional num-bindings)
+(defun compile-mvb (package start-offset str-end asm-stack env-start env tail-call return-offset &optional num-bindings)
   ;; (defmacro multiple-value-bind (bindings expr &rest body)
   ;;   `(apply-values (lambda ,bindings ,@body) ,expr))
   ;; creates a binding in env and pushes the corresponding register
@@ -839,18 +839,18 @@
     (cond
       ((and (eq num-bindings nil) (eq kind 'special) (eq value (char-code #\()))
        ;; start of binding list
-       (compile-mvb-expr package offset str-end asm-stack env-start env tail-call)
+       (compile-mvb-expr package offset str-end asm-stack env-start env tail-call return-offset)
        )
       (t (error 'malformed-error :offset start-offset)))))
 
-(defun compile-with-allocation-body (var byte-size package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-with-allocation-body (var byte-size package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; (with-allocation (binding byte-size) body...)
   (format *standard-output* ";; with-allocation body ~A ~A~%" var byte-size)
   (multiple-value-bind (offset asm-stack env kind value)
-      (compile-body 0 package start-offset str-end asm-stack env-start env tail-call)
+      (compile-body 0 package start-offset str-end asm-stack env-start env tail-call return-offset)
     (values offset (emit-stack-free asm-stack byte-size) (env-pop-alloc byte-size env))))
 
-(defun compile-with-allocation-binding-end (var byte-size package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-with-allocation-binding-end (var byte-size package start-offset str-end asm-stack env-start env tail-call return-offset)
   (multiple-value-bind (kind value offset)
       (compile-read-token package start-offset)
     (if (not (and (eq kind 'special) (eq value (char-code #\)))))
@@ -859,9 +859,10 @@
                                   (emit-stack-alloc-binding asm-stack byte-size)
                                   env-start
                                   (env-push-alloc-binding var byte-size env)
-                                  tail-call)))
+                                  tail-call
+                                  (+ (or return-offset 0) *REGISTER-SIZE* byte-size))))
 
-(defun compile-with-allocation-byte-size (var package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-with-allocation-byte-size (var package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; (with-allocation (binding byte-size) body...)
   (multiple-value-bind (kind value offset)
       (compile-read-token package start-offset)
@@ -869,25 +870,26 @@
       ((eq kind 'integer)
        (format *standard-output* ";; with-allocation ~A ~A~%" var value)
        (compile-with-allocation-binding-end var
-                                            value
+                                            (align-bytes value)
                                             package
                                             offset
                                             str-end
                                             asm-stack
                                             env-start
                                             env
-                                            tail-call))
+                                            tail-call
+                                            return-offset))
       (t (error 'malformed-error :offset start-offset)))))
 
-(defun compile-with-allocation-binding (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-with-allocation-binding (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; (with-allocation (binding byte-size) body...)
   (multiple-value-bind (kind value offset)
       (compile-read-token package start-offset)
     (cond
-      ((eq kind 'symbol) (compile-with-allocation-byte-size value package offset str-end asm-stack env-start env tail-call))
+      ((eq kind 'symbol) (compile-with-allocation-byte-size value package offset str-end asm-stack env-start env tail-call return-offset))
       (t (error 'malformed-error :offset start-offset)))))
 
-(defun compile-with-allocation (package start-offset str-end asm-stack env-start env tail-call)
+(defun compile-with-allocation (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; (with-allocation (binding byte-size) body...)
   (format *standard-output* ";; with-allocation~%")
   (multiple-value-bind (kind value offset)
@@ -895,7 +897,7 @@
       (compile-read-token package start-offset)
     (cond
       ((and (eq kind 'special) (eq value (char-code #\()))
-       (compile-with-allocation-binding package offset str-end asm-stack env-start env tail-call))
+       (compile-with-allocation-binding package offset str-end asm-stack env-start env tail-call return-offset))
       (t (error 'malformed-error :offset start-offset)))))
 
 ;;; Require
@@ -924,12 +926,10 @@
         (progn
           (package-add-source-file package full-path)
           (multiple-value-bind (req-offset asm-stack env kind value)
-              (repl-compile-file full-path package str-end asm-stack env-start env t)
+              (repl-compile-file full-path package str-end asm-stack env-start env *allow-tail-calls*)
             (format *standard-output* ";; ~A required~%" (ptr-read-string path))
             (values start-offset (emit-reg-call asm-stack 0) env)))
         (values start-offset asm-stack env))))
-
-;;; todo only require files once
 
 (defun compile-require (package start-offset str-end asm-stack env-start env)
   (multiple-value-bind (kind path offset)
@@ -978,15 +978,15 @@
         (string-equal sym "with-allocation")
         (string-equal sym "require"))))
 
-(defun compile-special-form (form package offset str-end asm-stack env-start env tail-call)
+(defun compile-special-form (form package offset str-end asm-stack env-start env tail-call return-offset)
   (let ((form-str (symbol-string form)))
     (cond
       ((string-equal form-str "if")
-       (compile-if package offset str-end asm-stack env-start env tail-call))
+       (compile-if package offset str-end asm-stack env-start env tail-call return-offset))
       ((string-equal form-str "cond")
-       (compile-cond package offset str-end asm-stack env-start env tail-call))
+       (compile-cond package offset str-end asm-stack env-start env tail-call return-offset))
       ((or (string-equal form-str "let") (string-equal form-str "let*"))
-       (compile-let package offset str-end asm-stack env-start env tail-call))
+       (compile-let package offset str-end asm-stack env-start env tail-call return-offset))
       ((or (string-equal form-str "set") (string-equal form-str "setq"))
        (compile-set package offset str-end asm-stack env-start env))
       ((or (string-equal form-str "var") (string-equal form-str "defvar") (string-equal form-str "defconstant"))
@@ -1000,32 +1000,32 @@
       ((string-equal form-str "apply-values")
        (compile-apply-values package offset str-end asm-stack env-start env))
       ((string-equal form-str "multiple-value-bind")
-       (compile-mvb package offset str-end asm-stack env-start env tail-call))
+       (compile-mvb package offset str-end asm-stack env-start env tail-call return-offset))
       ((string-equal form-str "lambda")
        (compile-lambda package offset str-end asm-stack env-start env))
       ((string-equal form-str "asm")
        (compile-asm package offset asm-stack env-start env))
       ((string-equal form-str "progn")
-       (compile-progn package offset str-end asm-stack env-start env tail-call))
+       (compile-progn package offset str-end asm-stack env-start env tail-call return-offset))
       ((string-equal form-str "with-allocation")
-       (compile-with-allocation package offset str-end asm-stack env-start env tail-call))
+       (compile-with-allocation package offset str-end asm-stack env-start env tail-call return-offset))
       ((string-equal form-str "require")
        (compile-require package offset str-end asm-stack env-start env))
       (t (error 'unknown-special-form-error :offset offset :form form-str)))))
 
 ;;; Calls
 
-(defun compile-call (package str str-end asm-stack env-start env tail-call)
+(defun compile-call (package str str-end asm-stack env-start env tail-call return-offset)
   (multiple-value-bind (kind value offset)
       (compile-read-token package str)
     (format *standard-output* ";; Calling ~A ~A ~A~%" kind (if (eq kind 'symbol) (symbol-string value) value) (special-form? value))
     (cond
       ;; special forms
       ((and (eq kind 'symbol) (special-form? value))
-       (compile-special-form value package offset str-end asm-stack env-start env tail-call))
+       (compile-special-form value package offset str-end asm-stack env-start env tail-call return-offset))
       ;; function calls
       ((eq kind 'symbol)
-       (compile-funcall value package offset str-end asm-stack env-start env tail-call))
+       (compile-funcall value package offset str-end asm-stack env-start env tail-call return-offset))
       (t (error 'malformed-error :offset str))))
   )
 
@@ -1107,7 +1107,7 @@
 
 ;;; The actual entry point for the compiler, sorta.
 
-(defun repl-compile-inner (package str str-end asm-stack env-start env &optional tail-call)
+(defun repl-compile-inner (package str str-end asm-stack env-start env &optional tail-call return-offset)
   (multiple-value-bind (kind value offset)
       (compile-read-token package str)
     (cond
@@ -1127,7 +1127,7 @@
       ((eq kind 'symbol)
        (values offset (emit-lookup asm-stack value env-start env (package-symbols package)) env))
       ((and (eq kind 'special) (eq value (char-code #\()))
-       (compile-call package offset str-end asm-stack env-start env tail-call))
+       (compile-call package offset str-end asm-stack env-start env tail-call return-offset))
       ((and (eq kind 'special) (eq value (char-code #\')))
        (compile-shortcut-quote package offset asm-stack env-start env))
       ((or (eq kind 'special) (eq kind 'eos))

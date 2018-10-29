@@ -1,0 +1,7 @@
+(require "runtime/string")
+(values (char-code #\N)
+  (is-upcase? #\N)
+  (is-downcase? #\N)
+  (downcase-char #\N)
+  (is-downcase? #\n))
+(asm (halt))
