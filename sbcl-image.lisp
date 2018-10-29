@@ -56,10 +56,40 @@
                                      output-file
                                      (concatenate 'string input-file ".bin")))))))
 
-(defun repl-save-image (path)
+(defun repl-disasm-disasm (input-file)
+  "Disassembles INPUT-FILE to *standard-output*."
+  (if (not input-file) (error 'no-input-files-error))
+  (format *error-output* "Disassembling ~A~%" input-file)
+  (with-open-file (f input-file
+                     :direction :input
+                     :external-format :default
+                     :element-type '(unsigned-byte 8))
+    (let ((seq (make-array (file-length f) :element-type '(unsigned-byte 8))))
+      (read-sequence seq f)
+      (repl::disassemble-asm seq))))
+
+(defun repl-disasm-help ()
+  (format *standard-output* "Options:~%")
+  (format *standard-output* "  -help     Print this helpful message~%")
+  (format *standard-output* "~%"))
+
+(defun repl-disasm-toplevel ()
+  "Command line entry point for the disassembler."
+  (multiple-value-bind (options more-args)
+      (parse-command-line-args (rest sb-ext:*posix-argv*))
+    (let ((input-file (first more-args)))
+      (if (assoc :help options)
+          (repl-disasm-help)
+          (repl-disasm-disasm input-file)))))
+
+(defun repl-save-image (path toplevel)
   "Saves the Lisp core image to PATH using REPL-COMPILER-TOPLEVEL as the init function."
-  (save-lisp-and-die path :toplevel #'repl-compiler-toplevel :executable t :purify t))
+  (save-lisp-and-die path :toplevel toplevel :executable t :purify t))
 
 (eval-when (:load-toplevel :execute)
-  (format *error-output* "Saving image...~%")
-  (repl-save-image (concatenate 'string "compiler" EXECUTABLE-EXT)))
+  (let ((mode (second sb-ext:*posix-argv*)))
+    (format *error-output* "Saving image for ~A...~%" mode)
+    (case (intern (string-upcase mode) :keyword)
+      (:compiler (repl-save-image (concatenate 'string "compiler" EXECUTABLE-EXT) #'repl-compiler-toplevel))
+      (:disassembler (repl-save-image (concatenate 'string "disassembler" EXECUTABLE-EXT) #'repl-disasm-toplevel))
+      (t (format *error-output* "Unknown mode: ~A~%" mode)))))
