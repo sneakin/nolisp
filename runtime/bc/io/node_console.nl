@@ -8,7 +8,7 @@
 (var node-console-flush-addr #xF0000100)
 (var node-console-buffer-addr #xF0000104)
 
-(defun node-console-write (str &optional (n (length str)))
+(defun node-console-fill (str &optional (n (length str)))
   (let ((num (if (> n node-console-memory-size)
                  node-console-memory-size
                  n)))
@@ -17,3 +17,8 @@
 
 (defun node-console-flush (&optional (n node-console-memory-size))
   (ptr-write-long n node-console-flush-addr))
+
+(defun node-console-write (str &optional (n (length str)))
+  (let ((num (node-console-fill str n)))
+    (node-console-flush num)
+    num))
