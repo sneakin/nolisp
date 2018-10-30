@@ -19,6 +19,7 @@
   (:CLS (0 #xe))
   (:INC (#x1) :ulong)
   (:ADDI (#x2 #x1))
+  (:MODI (#x2 #x8))
   (:SUBI (#x2 #x9))
   (:MULI (#x2 #x2))
   (:POWI (#x2 #x4))

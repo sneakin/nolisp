@@ -28,6 +28,7 @@
     ((eq op :CLS) (make-short 0 #xe a b))
     ((eq op :INC) (make-short #x1 a b c))
     ((eq op :ADDI) (make-short #x2 #x1 a b))
+    ((eq op :MODI) (make-short #x2 #x8 a b))
     ((eq op :SUBI) (make-short #x2 #x9 a b))
     ((eq op :MULI) (make-short #x2 #x2 a b))
     ((eq op :POWI) (make-short #x2 #x4 a b))

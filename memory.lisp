@@ -29,6 +29,10 @@
   (+ ptr 1))
 
 #+:sbcl
+(defun ptr-write-char (c ptr)
+  (ptr-write-byte (char-code c) ptr))
+
+#+:sbcl
 (defun ptr-read-array (ptr elements &optional (arr (make-array elements :element-type '(unsigned-byte 8))))
   (dotimes (n elements)
     (setf (aref arr n) (ptr-read-byte (+ ptr n))))

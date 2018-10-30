@@ -3,6 +3,7 @@
 (defvar *COMPILER* 0)
 
 (require "runtime/truth")
+(require "runtime/halt")
 (require "runtime/eq")
 (require "runtime/null")
 (require "runtime/number")

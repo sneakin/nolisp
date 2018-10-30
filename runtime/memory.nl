@@ -42,6 +42,9 @@
 (defun ptr-write-byte (c ptr)
   (ptr-write-ubyte c ptr))
 
+(defun ptr-write-char (c ptr)
+  (ptr-write-ubyte c ptr))
+
 (defun ptr-read-float (ptr)
   (ptr-read-long ptr))
 

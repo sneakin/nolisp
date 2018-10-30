@@ -63,6 +63,12 @@
   (assert-equal (string-equal "Hello\nworld" "Hello World") nil)
   )
 
+(defun test-itoa ()
+  (with-allocation (out 32)
+    (assert (string-equal "1234" (itoa 1234 out)))
+    (assert (string-equal "-1234" (itoa -1234 out)))
+    (assert (string-equal "1234" (itoa #x1234 out 16)))
+    (assert (string-equal "-1234" (itoa #x-1234 out 16)))))
 
 (defun test-string ()
   (test-string-access)
@@ -71,6 +77,7 @@
   (test-string-length)
   (test-string=)
   (test-string-equal)
+  (test-itoa)
   )
 
 (run-test-suite test-string/0)
