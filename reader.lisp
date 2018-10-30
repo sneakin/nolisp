@@ -101,11 +101,11 @@
       (t (values 'float (float acc) str token-offset))))
   )
 
-(defun read-number (str acc base token-offset)
+(defun read-signed-number (str acc base token-offset)
   (let ((c (ptr-read-byte str)))
     (cond
       ((or (digit? c) (and (alpha? c) (> base 10)))
-       (read-number (+ 1 str) (+ (* base acc) (digit-value c)) base token-offset))
+       (read-signed-number (+ 1 str) (+ (* base acc) (digit-value c)) base token-offset))
       ((and (alpha? c) (<= base 10))
        (error 'invalid-character-error :offset str :value c))
       ((eq c (char-code #\.)) (read-decimal (+ 1 str) acc base token-offset 1))
@@ -115,15 +115,24 @@
   (let ((c (ptr-read-byte str)))
     (if (digit? c)
         (multiple-value-bind (kind value offset token-offset)
-            (read-number str acc base token-offset)
+            (read-signed-number str acc base token-offset)
           (values kind (- value) offset token-offset))
         (read-symbol (- str 1) token-offset))))
 
 (defun read-plus (str token-offset)
   (let ((c (ptr-read-byte (+ 1 str))))
     (cond
-      ((digit? c) (read-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
+      ((digit? c) (read-signed-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
       (t (read-symbol str token-offset)))))
+
+(defun read-number (str acc base token-offset)
+  (let ((c (ptr-read-byte str)))
+    (cond
+      ((eq c (char-code #\-))
+       (read-negative-number (+ str 1) 0 base token-offset))
+      ((eq c (char-code #\+))
+       (read-signed-number (+ str 1) 0 base token-offset))
+      (t (read-signed-number str acc base token-offset)))))
 
 (defun read-comment (str)
   (if (newline? (ptr-read-byte str))
@@ -217,7 +226,7 @@
   (let ((c (ptr-read-byte str)))
     (cond
       ((space? c) (read-token (+ 1 str) token-offset))
-      ((digit? c) (read-number str 0 *NUMBER-BASE* token-offset))
+      ((digit? c) (read-signed-number str 0 *NUMBER-BASE* token-offset))
       ((eq c (char-code #\+)) (read-plus str token-offset))
       ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
       ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset))
