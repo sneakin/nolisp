@@ -230,10 +230,12 @@
       (t (values 'unknown nil (+ 1 str) token-offset)))))
 
 (defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
-  (multiple-value-bind (kind value offset token-offset)
+  (multiple-value-bind (kind value offset new-token-offset)
       (read-token offset token-offset)
     ;; (format *standard-output* "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
     (cond
+      ((eq kind 'symbol)
+       (scan-list offset new-token-offset initiator terminator depth))
       ((and (eq kind 'special) (eq value initiator))
        (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
       ((and (eq kind 'special) (eq value terminator))
