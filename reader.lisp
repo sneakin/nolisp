@@ -113,7 +113,7 @@
 
 (defun read-negative-number (str acc base token-offset)
   (let ((c (ptr-read-byte str)))
-    (if (digit? c)
+    (if (or (digit? c) (and (alpha? c) (> base 10)))
         (multiple-value-bind (kind value offset token-offset)
             (read-signed-number str acc base token-offset)
           (values kind (- value) offset token-offset))
@@ -148,6 +148,8 @@
     ((eq c (char-code #\t)) #\tab)
     ((eq c (char-code #\\)) #\\)
     ((eq c (char-code #\/)) #\/)
+    ((eq c (char-code #\0)) #\0)
+    ;; todo \xHH \d### \b \v \[a-z] \0
     (t (error 'invalid-escape-error :char c))))
 
 (defun read-string (str output &optional (terminator #\") output-start)

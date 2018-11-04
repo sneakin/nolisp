@@ -23,6 +23,5 @@
     ))
 
 (repl-eval "(values (+ 1 2 3 4) (+ (* 2 2) (* 3 3)")
-
-(read-token)
-(asm (halt))
+;(read-token)
+(halt)

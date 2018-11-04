@@ -43,15 +43,15 @@
   (assert-equal (expt 100 1) 100)
   (assert-equal (expt 100 0) 1))
 
-(defun test-logi2 ()
-  (assert-equal (logi2 123) 6)
-  (assert-equal (logi2 4567) 12))
+(defun test-log2 ()
+  (assert-equal (log2 123) 6)
+  (assert-equal (log2 4567) 12))
 
-(defun test-logi ()
-  (assert-equal (logi 123 10) 2)
-  (assert-equal (logi 12345 10) 4)
-  (assert-equal (logi 1234 16) 2)
-  (assert-equal (logi 12345 16) 3))
+(defun test-log ()
+  (assert-equal (log 123 10) 2)
+  (assert-equal (log 12345 10) 4)
+  (assert-equal (log 1234 16) 2)
+  (assert-equal (log 12345 16) 3))
 
 (defun test-math ()
   (test-add)
@@ -60,7 +60,7 @@
   (test-div)
   (test-mod)
   (test-expt)
-  (test-logi2)
-  (test-logi))
+  (test-log2)
+  (test-log))
 
 (run-test-suite test-math)

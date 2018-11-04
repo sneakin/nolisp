@@ -42,8 +42,9 @@
 )
 
 (defun gen-func-name (package func-name arity)
-  (package-intern package
-                  (concatenate 'string (ptr-read-string func-name) "/" (itoa arity))))
+  (with-allocation (buffer 36)
+    (package-intern package
+                  (concatenate 'string (ptr-read-string func-name) "/" (itoa arity buffer)))))
 
 
 ;;; funcall

@@ -9,25 +9,13 @@
     (assert-equal (ptr-read-ubyte str) #\W)
     (assert-equal (ptr-read-ubyte (+ str 1)) #\o)))
 
-(defun test-downcase-char ()
-  (assert-eq (downcase-char #\h) #\h)
-  (assert-eq (downcase-char #\H) #\h)
-  (assert-eq (downcase-char #\1) #\1)
-  )
-
-(defun test-upcase-char ()
-  (assert-eq (upcase-char #\H) #\H)
-  (assert-eq (upcase-char #\h) #\H)
-  (assert-eq (upcase-char #\1) #\1)
-  )
-
 (defun test-downcase ()
-  (assert-equal (downcase "HELLO") "hello")
-  (assert-equal (downcase "HELLO\nw0rld!?") "hello\nw0rld!?"))
+  (assert (string-equal (downcase "HELLO") "hello"))
+  (assert (string-equal (downcase "HELLO\nw0rld!?") "hello\nw0rld!?")))
 
 (defun test-upcase ()
-  (assert-equal (upcase "hello") "HELLO")
-  (assert-equal (upcase "HELLO\nw0rld!?") "HELLO\nW0RLD!?"))
+  (assert (string-equal (upcase "hello") "HELLO"))
+  (assert (string-equal (upcase "HELLO\nw0rld!?") "HELLO\nW0RLD!?")))
 
 (defun test-string-length ()
   (assert-equal (length nil) 0)
@@ -63,21 +51,13 @@
   (assert-equal (string-equal "Hello\nworld" "Hello World") nil)
   )
 
-(defun test-itoa ()
-  (with-allocation (out 32)
-    (assert (string-equal "1234" (itoa 1234 out)))
-    (assert (string-equal "-1234" (itoa -1234 out)))
-    (assert (string-equal "1234" (itoa #x1234 out 16)))
-    (assert (string-equal "-1234" (itoa #x-1234 out 16)))))
-
 (defun test-string ()
   (test-string-access)
-  (test-downcase-char)
-  (test-upcase-char)
   (test-string-length)
   (test-string=)
   (test-string-equal)
-  (test-itoa)
+  (test-downcase)
+  (test-upcase)
   )
 
 (run-test-suite test-string/0)

@@ -22,6 +22,7 @@
                            mod-name)
                  :type ext))
 
+;; todo need to also search multiple file directories
 (defconstant *repl-extensions* '("lisp" "nl"))
 
 (defun repl-resolve-path (mod-name &optional (extensions *repl-extensions*))
