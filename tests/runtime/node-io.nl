@@ -1,13 +1,12 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
 (require "runtime/bc/io/console")
-(require "runtime/bc/io/node_console")
 (require "runtime/halt")
 (require "runtime/itoa")
 
 (var *banner* "WELCOME!!")
 
-(node-output-write 'hello-world)
+(console-write 'hello-world)
 (console-write "\n\n")
 (console-write *banner*)
 (console-write-integer -123)

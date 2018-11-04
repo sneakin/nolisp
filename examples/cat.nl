@@ -1,13 +1,14 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(require "runtime/bc/io/node_console")
+(require "runtime/bc/io/input-dev")
+(require "runtime/bc/io/output-dev")
 
 (defun print-input ()
-  (if (and (node-input-eos) (eq 0 (node-input-bytes-read)))
+  (if (and (input-dev-eos) (eq 0 (input-dev-bytes-read)))
       0
       (progn
-        (node-output-write node-input-buffer-buffer-addr (node-input-bytes-read))
-        (node-input-wait)
+        (output-dev-write input-dev-buffer-buffer-addr (input-dev-bytes-read))
+        (input-dev-wait)
         (print-input))))
 
 (print-input)
