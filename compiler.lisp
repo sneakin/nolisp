@@ -903,20 +903,31 @@
 
 ;;; Require
 
-(defvar *load-path* ".")
-#-:repl (defvar *load-extensions* '(".nl" ".lisp"))
+#-:repl (defvar *load-path* (list (make-pathname :directory '(:relative "."))
+                                  (make-pathname :directory '(:relative "." "runtime"))))
+#-:repl (defvar *load-extensions* '("nl" "lisp"))
 
 #-:repl
-(defun resolve-load-path (path &optional (extensions *load-extensions*))
-  (let ((p1 (concatenate 'string (ptr-read-string path) (first extensions))))
+(defun resolve-load-path-ext (path &optional (extensions *load-extensions*))
+  (let ((p1 (merge-pathnames (make-pathname :type (first extensions))
+                             path)))
     (if (probe-file p1)
         p1
         (if extensions
-            (resolve-load-path path (rest extensions))
+            (resolve-load-path-ext path (rest extensions))))))
+
+#-:repl
+(defun resolve-load-path (path &optional (search-paths *load-path*) (extensions *load-extensions*))
+  (let* ((p1 (merge-pathnames (make-pathname :name (ptr-read-string path)) (first search-paths)))
+         (candidate (resolve-load-path-ext p1 extensions)))
+    (if candidate
+        (namestring candidate)
+        (if search-paths
+            (resolve-load-path path (rest search-paths) extensions)
             (error 'no-file-error :path path)))))
 
 #+:repl
-(defun resolve-load-path (path &optional extensions)
+(defun resolve-load-path (path &optional search-paths extensions)
   (error 'no-file-error :path path))
 
 (defun compile-require-it (path package start-offset str-end asm-stack env-start env)

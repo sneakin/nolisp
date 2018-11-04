@@ -14,6 +14,8 @@
            (string= arg "-h")) (values :help t (rest args)))
       ((or (string= arg "-o")
            (string= arg "--output"))  (values :output (second args) (rest (rest args))))
+      ((or (string= arg "-L")
+           (string= arg "--search"))  (values :search-path (second args) (rest (rest args))))
       (t (values nil nil (rest args) (first args))))))
 
 (defun parse-command-line-args (args &optional options unused)
@@ -41,6 +43,7 @@
   (format *standard-output* "Options:~%")
   (format *standard-output* "  -help     Print this helpful message~%")
   (format *standard-output* "  -o path   Path of the output file~%")
+  (format *standard-output* "  -L path   Path to search for required files~%")
   (format *standard-output* "~%"))
 
 (defun repl-compiler-toplevel ()
@@ -48,7 +51,15 @@
   (multiple-value-bind (options more-args)
       (parse-command-line-args (rest sb-ext:*posix-argv*))
     (let ((input-file (first more-args))
-          (output-file (cdr (assoc :output options))))
+          (output-file (cdr (assoc :output options)))
+          (search-path (cdr (assoc :search-path options)))
+          (image-root (make-pathname :directory (pathname-directory (pathname (first sb-ext:*posix-argv*))))))
+      ;; add the binary's path to the load-path
+      (push image-root repl::*load-path*)
+      (push (merge-pathnames (make-pathname :name "runtime") image-root) repl::*load-path*)
+      ;; and add the path from the command line
+      (if search-path (push (make-pathname :directory `(:relative ,search-path)) repl::*load-path*))
+      ;; command mode dispatch:
       (if (assoc :help options)
           (repl-compiler-help)
           (repl-compiler-compile input-file
