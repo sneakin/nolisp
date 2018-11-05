@@ -12,9 +12,11 @@
 (defun package-string-segment-data (package))
 
 (defun symbol-gen (offset &optional (segment (package-string-segment-data *COMPILER*)))
-  (multiple-value-bind (sym new-ending)
-      (symbol-intern (concatenate 'string *symbol-gen-prefix* (itoa *symbol-next-token*))
-                     segment offset)
-    (setq *symbol-next-token* (+ *symbol-next-token* 1))
-    (values sym new-ending)))
+  (with-allocation (str 36)
+    (multiple-value-bind (sym new-ending)
+        (symbol-intern (concatenate 'string *symbol-gen-prefix* (itoa *symbol-next-token* str))
+                       segment offset)
+      (setq *symbol-next-token* (+ *symbol-next-token* 1))
+      (values sym new-ending)))
+  )
 

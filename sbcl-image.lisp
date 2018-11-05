@@ -97,10 +97,16 @@
   "Saves the Lisp core image to PATH using REPL-COMPILER-TOPLEVEL as the init function."
   (save-lisp-and-die path :toplevel toplevel :executable t :purify t))
 
-(eval-when (:load-toplevel :execute)
-  (let ((mode (second sb-ext:*posix-argv*)))
-    (format *error-output* "Saving image for ~A...~%" mode)
+(defun repl-imager-toplevel (args)
+  (let* ((mode (second args))
+         (output-path (or (third args)
+                          (concatenate 'string mode EXECUTABLE-EXT))))
+    (format *error-output* "Saving image for ~A to ~A...~%" mode output-path)
     (case (intern (string-upcase mode) :keyword)
-      (:compiler (repl-save-image (concatenate 'string "compiler" EXECUTABLE-EXT) #'repl-compiler-toplevel))
-      (:disassembler (repl-save-image (concatenate 'string "disassembler" EXECUTABLE-EXT) #'repl-disasm-toplevel))
+      (:compiler (repl-save-image output-path #'repl-compiler-toplevel))
+      (:disassembler (repl-save-image output-path #'repl-disasm-toplevel))
       (t (format *error-output* "Unknown mode: ~A~%" mode)))))
+
+(eval-when (:load-toplevel :execute)
+  (handler-case (repl-imager-toplevel sb-ext:*posix-argv*)
+    (condition (err) (format *error-output* "Error: ~A~%" err))))

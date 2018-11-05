@@ -918,7 +918,7 @@
 
 #-:repl
 (defun resolve-load-path (path &optional (search-paths *load-path*) (extensions *load-extensions*))
-  (let* ((p1 (merge-pathnames (make-pathname :name (ptr-read-string path)) (first search-paths)))
+  (let* ((p1 (merge-pathnames (parse-namestring (ptr-read-string path)) (first search-paths)))
          (candidate (resolve-load-path-ext p1 extensions)))
     (if candidate
         (namestring candidate)

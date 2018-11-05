@@ -1,6 +1,8 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "runtime/logic")
 (require "runtime/cmp")
+(require "runtime/math")
 
 (defun code-char (char)
   char)
