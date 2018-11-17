@@ -57,3 +57,6 @@ namespace :lisp do
     sh("rm -rf #{Shellwords.escape(buildroot)}")
   end
 end
+
+task :default => 'lisp:default'
+task :clean => 'lisp:clean'
