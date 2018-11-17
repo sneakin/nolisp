@@ -85,7 +85,7 @@
       (compile-funcall-resolve package env-start env func-name args)
     (if (not reg) (error 'undefined-function-error :offset str :name func-name :args args))
     (format *standard-output* ";; Call ~A R~A+~A: ~A args ~A~%" (symbol-string func-name)  reg (* *REGISTER-SIZE* data-offset) args (if tail-call "tail" ""))
-    (if tail-call
+    (if (and tail-call (not (= reg 11))) ;; todo need the func's address before tail calling to tail call stack functions
         (compile-funcall-tail package str asm-stack env-start env reg data-offset args return-offset)
         (compile-funcall-push package str asm-stack env-start env reg data-offset args))))
 
@@ -377,7 +377,8 @@
   )
 
 (defun compile-lambda-arglist (package start-offset str-end orig-asm-stack env-start env name &optional (num-args 0))
-  (let ((orig-cs-position (package-code-segment-position package)))
+  (let ((orig-cs-position (package-code-segment-position package))
+        (lambda-env (env-push-binding name env))) ;; account for the lambda's name
     (multiple-value-bind (kind value offset)
         (compile-read-token package start-offset)
       (cond
@@ -385,12 +386,18 @@
         ((and (eq kind 'special) (eq value (char-code #\()))
          (format *standard-output* ";; Lambda ~A at ~A~%" (symbol-string name) orig-cs-position)
          (multiple-value-bind (offset asm-stack env kind value)
-             (compile-lambda-bindings num-args package offset str-end orig-asm-stack env env name)
+             (compile-lambda-bindings (+ 1 num-args) package offset str-end
+                                      ;; push the function pointer to the stack for self reference
+                                      (emit-push (emit-value orig-asm-stack 'integer (package-code-segment-position package)) 0)
+
+                                      lambda-env
+                                      lambda-env
+                                      name)
            (values offset
                    ;; emit the lambda's address in the code-segment onto the
                    ;; asm-stack at the original asm-stack. This will get used
                    ;; when the lambda call returns.
-                   (emit-value asm-stack 'integer orig-cs-position)
+                   (emit-value orig-asm-stack 'integer orig-cs-position)
                    env-start)))
         (t (error 'malformed-lambda-error :offset start-offset))))))
 
@@ -408,19 +415,15 @@
                                   start-offset
                                   offset)
                               str-end
-                              ;; need something on the stack, make it the function pointer
-                              (emit-push (emit-value orig-asm-stack 'integer (package-code-segment-position package)) 0)
+                              orig-asm-stack
                               env
-                              (env-push-binding
-                               (cond
-                                 ;; named lambda, extract the name and bind it to the stack
-                                 ((eq kind 'symbol) value)
-                                 ;; start of the arglist w/o a name
-                                 ((and (eq kind 'special) (eq value (char-code #\())) name)
-                                 (t (error 'malformed-lambda-error :offset start-offset)))
-                               env)
-                              name
-                              1))))
+                              env
+                              (cond
+                                ;; named lambda, extract the name and bind it to the stack
+                                ((eq kind 'symbol) value)
+                                ;; start of the arglist w/o a name
+                                ((and (eq kind 'special) (eq value (char-code #\())) name)
+                                (t (error 'malformed-lambda-error :offset start-offset)))))))
 
 ;; SET
 
@@ -672,11 +675,61 @@
       (compile-read-token package start-offset)
     (if (not (eq kind 'symbol))
         (error 'malformed-error :offset start-offset))
-    (package-define package name)
+    ; (package-define package name)
     (multiple-value-bind (offset new-asm-stack new-env)
         (compile-def-arglist package offset str-end orig-asm-stack env-start env name)
       (format *standard-output* ";; storing ~A ~A~%" (ptr-read-string name) name)
       (values offset new-asm-stack new-env))))
+
+
+;;; ISRs
+
+(defun compile-isr-body (package start-offset str-end orig-asm-stack env-start env func-name)
+  ;; compiles a function's body binding it to func-name
+  (multiple-value-bind (offset asm-stack env kind value)
+      (compile-progn package
+                     start-offset
+                     str-end
+                     orig-asm-stack
+                     env
+                     env
+                     nil
+                     0)
+    (format *standard-output* ";; ISR closing ~A~%" (symbol-string func-name))
+    (let* ((asm-stack (emit-isr-return asm-stack))
+           (cs (package-code-segment-offset package)))
+      ;; copy code from asm-stack to code-segment
+      (package-copy-to-code-segment package orig-asm-stack (- asm-stack orig-asm-stack))
+      (format *standard-output* ";; Copied to code-segment ~A ~A ~A~%" cs (- cs (package-code-segment-buffer package))  (- asm-stack orig-asm-stack))
+      (values offset
+              (emit-value orig-asm-stack 'integer (- cs (package-code-segment-buffer package)))
+              env-start))))
+
+(defun compile-define-isr (package start-offset str-end orig-asm-stack env-start env)
+  ;; read the name and compile like a lambda but without arguments
+  (multiple-value-bind (kind name offset)
+      (compile-read-token package start-offset)
+    (if (not (eq kind 'symbol))
+        (error 'malformed-error :offset start-offset))
+    ;; define toplevel binding
+    (package-define package name)
+    (multiple-value-bind (offset asm-stack env kind value)
+        (compile-isr-body package offset str-end orig-asm-stack env-start env name)
+      (values offset
+              ;; set toplevel binding
+              (emit-toplevel-store-reg asm-stack
+                                       name
+                                       (package-symbols package))
+              env-start))))
+
+
+(defun compile-isr (package start-offset str-end orig-asm-stack env-start env)
+  ;; lambdas generate a symbol to name a new function.
+  ;; generate a toplevel name
+  (multiple-value-bind (name)
+      (package-symbol-gen package)
+    (format *standard-output* ";; compile-isr ~A ~A ~A~%" start-offset env-start env)
+    (compile-isr-body package start-offset str-end orig-asm-stack env-start env name)))
 
 
 ;;; quote
@@ -848,7 +901,7 @@
   ;; (with-allocation (binding byte-size) body...)
   (format *standard-output* ";; with-allocation body ~A ~A~%" var byte-size)
   (multiple-value-bind (offset asm-stack env kind value)
-      (compile-body 0 package start-offset str-end asm-stack env-start env tail-call return-offset)
+      (compile-body 0 package start-offset str-end asm-stack env-start env nil return-offset)
     (values offset (emit-stack-free asm-stack byte-size) (env-pop-alloc byte-size env))))
 
 (defun compile-with-allocation-binding-end (var byte-size package start-offset str-end asm-stack env-start env tail-call return-offset)
@@ -969,26 +1022,30 @@
 
 (defun special-form? (symbol-offset)
   (let ((sym (symbol-string symbol-offset)))
-    (or (string-equal sym "if")
-        (string-equal sym "cond")
-        (string-equal sym "let")
-        (string-equal sym "let*")
-        (string-equal sym "set")
-        (string-equal sym "setq")
-        (string-equal sym "var")
-        (string-equal sym "defvar")
-        (string-equal sym "defconstant")
-        (string-equal sym "def")
-        (string-equal sym "defun")
-        (string-equal sym "quote")
-        (string-equal sym "values")
-        (string-equal sym "apply-values")
-        (string-equal sym "multiple-value-bind")
-        (string-equal sym "lambda")
-        (string-equal sym "asm")
-        (string-equal sym "progn")
-        (string-equal sym "with-allocation")
-        (string-equal sym "require"))))
+    (cond
+      ((string-equal sym "if") t)
+      ((string-equal sym "cond") t)
+      ((string-equal sym "let") t)
+      ((string-equal sym "let*") t)
+      ((string-equal sym "set") t)
+      ((string-equal sym "setq") t)
+      ((string-equal sym "var") t)
+      ((string-equal sym "defvar") t)
+      ((string-equal sym "defconstant") t)
+      ((string-equal sym "def") t)
+      ((string-equal sym "defun") t)
+      ((string-equal sym "define-isr") t)
+      ((string-equal sym "isr") t)
+      ((string-equal sym "quote") t)
+      ((string-equal sym "values") t)
+      ((string-equal sym "apply-values") t)
+      ((string-equal sym "multiple-value-bind") t)
+      ((string-equal sym "lambda") t)
+      ((string-equal sym "asm") t)
+      ((string-equal sym "progn") t)
+      ((string-equal sym "with-allocation") t)
+      ((string-equal sym "require") t)
+      (t nil))))
 
 (defun compile-special-form (form package offset str-end asm-stack env-start env tail-call return-offset)
   (let ((form-str (symbol-string form)))
@@ -1005,6 +1062,10 @@
        (compile-var package offset str-end asm-stack env-start env))
       ((or (string-equal form-str "def") (string-equal form-str "defun"))
        (compile-def package offset str-end asm-stack env-start env))
+      ((string-equal form-str "define-isr")
+       (compile-define-isr package offset str-end asm-stack env-start env))
+      ((string-equal form-str "isr")
+       (compile-isr package offset str-end asm-stack env-start env))
       ((string-equal form-str "quote")
        (compile-quote package offset asm-stack env-start env))
       ((string-equal form-str "values")
