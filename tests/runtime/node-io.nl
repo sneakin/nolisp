@@ -47,6 +47,11 @@
   (console-write "\n\t")
   (console-write (itoa-unsigned #x-1 str 2))
   (console-write "\n"))
+(output-dev-write "Format test:\n")
+(cformat *standard-output* "%S, Formatting %i with %%i and %x with %%x and %c with %%c.\n" (upcase "You") 123 #x123 #x50)
+(cformat *standard-output* "Done\n")
+(format *standard-output* "~S, Formatting ~i with ~~i and ~x with ~~x and ~c with ~~c.~%" (upcase "You") 123 #x123 #x50)
+(format *standard-output* "Done~%")
 (console-write "\nGood bye...\n")
 
 (halt)
