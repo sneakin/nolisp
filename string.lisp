@@ -9,15 +9,28 @@
 #+:sbcl
 (defun itoa (n output-seq &optional (base 10))
   (let ((old-base *print-base*))
-    (setq *print-base* base)
-    (let ((str (format nil "~A" n)))
-      (setq *print-base* old-base)
-      (ptr-write-string str output-seq)
-      str)))
+    (unwind-protect
+         (progn (setq *print-base* base)
+                (let ((str (format nil "~A" n)))
+                  (ptr-write-string str output-seq)
+                  str))
+      (setq *print-base* old-base))))
 
 #+:sbcl
 (defun string-aref (str n)
-  (aref str n))
+  (let ((str (ptr-read-string str)))
+    (if (>= n (length str))
+        0
+        (aref str n))))
 
+#-:sbcl
 (defun string-concat (a b output)
-  (ptr-write-string b (ptr-write-string a output)))
+  (ptr-write-string b (- (ptr-write-string a output) 1)))
+
+#+:sbcl
+(defun string-concat (a b output)
+  (ptr-write-string b (- (ptr-write-string a output) 1)))
+
+#+:sbcl
+(defun string-position (char str &optional (n 0))
+  (position char (ptr-read-string str) :start n))

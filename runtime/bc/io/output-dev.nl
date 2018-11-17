@@ -6,8 +6,10 @@
 
 (var output-dev-base-addr #xF0002000)
 (var output-dev-memory-size 1024)
-(var output-dev-buffer-addr output-dev-base-addr)
-(var output-dev-flush-addr (+ output-dev-base-addr output-dev-memory-size))
+(var output-dev-eos-addr output-dev-base-addr)
+(var output-dev-cmd-addr (+ output-dev-eos-addr 4))
+(var output-dev-buffer-addr (+ output-dev-cmd-addr 4))
+(var output-dev-flush-addr (+ output-dev-buffer-addr output-dev-memory-size))
 
 (defun output-dev-write-string (str &optional (n (length str)))
   (let ((num (if (> n output-dev-memory-size)
@@ -16,13 +18,33 @@
     (ptr-copy str output-dev-buffer-addr num)
     num))
 
+(defun output-dev-eos ()
+  (ptr-read-ulong output-dev-eos-addr))
+
+(defun output-dev-wait ()
+  (if (= (output-dev-eos) 0) ;; EOS == ok
+      t
+      (if (= (output-dev-eos) 4) ;; EOS == FULL
+          (progn
+            (sleep)
+            (output-dev-wait))
+          nil)))
+
+#+:never
 (defun output-dev-flush (&optional (n output-dev-memory-size))
-  (ptr-write-long n output-dev-flush-addr))
+  (if (output-dev-wait)
+      (ptr-write-long n output-dev-flush-addr)
+      nil))
+
+(defun output-dev-flush (&optional (n output-dev-memory-size))
+  (ptr-write-long n output-dev-flush-addr)
+  n)
 
 (defun output-dev-write (str &optional (n (length str)))
   (let ((num (output-dev-write-string str n)))
-    (output-dev-flush num)
-    num))
+    (if (output-dev-flush num)
+        num
+        nil)))
 
 (defun output-dev-write-byte (c)
   (ptr-write-ubyte 0 (ptr-write-ubyte c output-dev-buffer-addr))

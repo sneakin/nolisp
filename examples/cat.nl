@@ -2,6 +2,7 @@
 
 (require "runtime/bc/io/input-dev")
 (require "runtime/bc/io/output-dev")
+(require "runtime/halt")
 
 (defun print-input ()
   (if (and (input-dev-eos) (eq 0 (input-dev-bytes-read)))
@@ -12,3 +13,4 @@
         (print-input))))
 
 (print-input)
+

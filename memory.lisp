@@ -24,6 +24,10 @@
       (aref *MEMORY* ptr)))
 
 #+:sbcl
+(defun ptr-read-ubyte (ptr)
+  (ptr-read-byte ptr))
+
+#+:sbcl
 (defun ptr-write-byte (c ptr)
   (setf (aref *MEMORY* ptr) c)
   (+ ptr 1))
@@ -43,6 +47,7 @@
   (dotimes (n (length array))
     (ptr-write-byte (aref array n) (+ ptr n))))
 
+#+:sbcl
 (defun ptr-read-ushort (ptr)
   (logior (ptr-read-byte ptr)
           (ash (ptr-read-byte (+ ptr 1)) 8)))
@@ -63,10 +68,12 @@
 (defun mask-ulong (byte n)
   (logand n (ash #xFF byte)))
 
+#+:sbcl
 (defun ptr-write-short (n ptr)
   (ptr-write-byte (mask-ulong 0 n) ptr)
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
 
+#+:sbcl
 (defun make-ulong (a b c d)
   (logior a
           (ash b 8)
@@ -97,9 +104,12 @@
 
 #+:sbcl
 (defun ptr-write-string (str ptr)
-  (dotimes (n (length str))
-    (ptr-write-byte (char-code (aref str n)) (+ n ptr)))
-  (ptr-write-byte 0 (+ (length str) ptr)))
+  (if (numberp str)
+      (ptr-write-string (ptr-read-string str) ptr)
+      (progn
+        (dotimes (n (length str))
+          (ptr-write-byte (char-code (aref str n)) (+ n ptr)))
+        (ptr-write-byte 0 (+ (length str) ptr)))))
 
 #+:repl
 (defun string-length (str &optional (n 0))
@@ -118,19 +128,20 @@
             (ptr-copy (+ src 1) (+ dest 1) (- count 1)))
           dest)))
 
-#+:repl
-(defun ptr-write-string (str ptr)
-  (ptr-copy str ptr (string-length ptr)))
-
-
 #+:sbcl
-(defun ptr-read-string (ptr &optional count acc (n 0))
+(defun ptr-read-string-loop (ptr count acc n)
   (let* ((c (ptr-read-byte ptr)))
     (if (or (and count (>= n count)) (zero? c))
         acc
         (progn
           (setf acc (concatenate 'string acc (list (code-char c))))
-          (ptr-read-string (+ 1 ptr) count acc (+ 1 n))))))
+          (ptr-read-string-loop (+ 1 ptr) count acc (+ 1 n))))))
+
+#+:sbcl
+(defun ptr-read-string (ptr &optional count acc (n 0))
+  (if (stringp ptr)
+      ptr
+      (ptr-read-string-loop ptr count acc n)))
 
 #+:repl
 (defun ptr-read-string (ptr &optional count acc (n 0))
@@ -257,9 +268,8 @@
 (defmacro with-allocation (binding &rest body)
   (let ((bytes (second binding))
         (binding (first binding)))
-    `(let* ((,binding (allocate ,bytes))
-            (ret (progn ,@body)))
+    `(unwind-protect
+         (let* ((,binding (allocate ,bytes)))
+           ,@body)
        (unallocate ,bytes)
-       ret)))
-
-
+       nil)))

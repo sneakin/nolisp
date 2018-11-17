@@ -4,6 +4,7 @@
 (require "runtime/logic")
 (require "runtime/math")
 (require "runtime/cmp")
+(require "runtime/halt")
 
 (var input-dev-base-addr #xF0003000)
 (var input-dev-memory-size 1024)
@@ -28,15 +29,23 @@
 (var input-dev-next-byte 0)
 
 (defun input-dev-read-more ()
-  (ptr-write-ulong 0 input-dev-read-addr))
+  (if (> (input-dev-bytes-read) 0)
+      (progn
+        (ptr-write-ulong 0 input-dev-read-addr)
+        t)))
 
 ;; todo wait using SLEEP and interrupt
-(defun input-dev-wait ()
-  (input-dev-read-more)
+(defun input-dev-wait-loop ()
   (if (or (> (input-dev-bytes-read) 0)
           (input-dev-eos))
       t
-      (input-dev-wait)))
+      (progn
+        (sleep)
+        (input-dev-wait-loop))))
+
+(defun input-dev-wait ()
+  (input-dev-read-more)
+  (input-dev-wait-loop))
 
 (defun input-dev-read-next ()
   (if (and (input-dev-eos)
@@ -49,3 +58,12 @@
         (let ((b (input-dev-get input-dev-next-byte)))
           (set input-dev-next-byte (+ input-dev-next-byte 1))          
           b))))
+
+(defun input-dev-readline (dest)
+  (input-dev-wait)
+  (if (and (input-dev-eos)
+          (not (input-dev-ready)))
+      nil
+      (progn
+        (ptr-write-ubyte 0 (ptr-copy input-dev-buffer-buffer-addr dest (input-dev-bytes-read)))
+        dest)))

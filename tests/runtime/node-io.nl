@@ -3,6 +3,7 @@
 (require "runtime/bc/io/console")
 (require "runtime/halt")
 (require "runtime/itoa")
+(require "runtime/io")
 
 (var *banner* "WELCOME!!")
 

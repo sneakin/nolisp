@@ -4,7 +4,7 @@
 (require "runtime/string")
 (require "runtime/itoa")
 
-(var console-base-addr #xF0001000)
+(var console-base-addr #xF0000800)
 (var console-memory-size 1024)
 (var console-buffer-addr console-base-addr)
 (var console-flush-addr (+ console-base-addr console-memory-size))
