@@ -9,9 +9,11 @@
 (require "runtime/char")
 (require "runtime/string")
 
+;; fixme need constant access at compile time or variable with-allocations
+;;(defconstant *itoa-max-length* 36)
+
 (defun itoa-unsigned-finish (n base output-seq output-start)
-  (ptr-write-char 0 (ptr-write-char (char-digit n base) output-seq))
-  output-start)
+  (values output-start (ptr-write-char 0 (ptr-write-char (char-digit n base) output-seq))))
 
 (defun itoa-unsigned-loop (n output-seq &optional (base *output-base*) (divisor (max-digit-value n base)) (output-start output-seq))
   (if (>-unsigned divisor 1)

@@ -66,13 +66,10 @@
     (t (error 'unknown-op-error :op op))))
 
 (defun emit-op (stack op &optional a b c)
-  (let ((op (if (symbolp op)
-                op
-                (intern (string-upcase op) "KEYWORD"))))
+  (let ((op (intern-keyword op)))
     (format *standard-output* "~A ~A ~A ~A    ~A~%" op (or a 0) (or b 0) (or c 0) (make-op op a b c))
     (ptr-write-short (make-op op a b c) stack)
-    (+ stack *SIZEOF_SHORT*))
-)
+    (+ stack *SIZEOF_SHORT*)))
 
 (defun emit-float (stack value)
   (format *standard-output* "float32(~A)~%" value)

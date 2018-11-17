@@ -21,22 +21,29 @@
 ")
 
 (defun symbol-special? (c)
-  (not (eq nil (index-of c *SYMBOL-SPECIALS*))))
+  (not (eq -1 (index-of c *SYMBOL-SPECIALS*))))
 
 (defun special? (c)
-  (not (eq nil (index-of c *SPECIALS*))))
+  (not (eq -1 (index-of c *SPECIALS*))))
 
 (defun list-initiator? (c)
-  (not (eq nil (index-of c *LIST-INITIATORS*))))
+  (not (eq -1 (index-of c *LIST-INITIATORS*))))
 
 (defun list-initiator-for (c)
-  (string-aref *LIST-INITIATORS* (index-of c *LIST-TERMINATORS*)))
+  (let ((i (index-of c *LIST-TERMINATORS*)))
+    (if (eq i -1)
+        nil
+        (string-aref *LIST-INITIATORS* i))))
 
 (defun list-terminator? (c)
-  (not (eq nil (index-of c *LIST-TERMINATORS*))))
+  (not (eq -1 (index-of c *LIST-TERMINATORS*))))
 
+;; todo signify if C is not an initiator
 (defun list-terminator-for (c)
-  (string-aref *LIST-TERMINATORS* (index-of c *LIST-INITIATORS*)))
+  (let ((i (index-of c *LIST-INITIATORS*)))
+    (if (eq i -1)
+        nil
+        (string-aref *LIST-TERMINATORS* i))))
 
 (defun list-terminator-code-for (c)
   (char-code (list-terminator-for c)))
@@ -45,7 +52,7 @@
   (or (eq c (char-code #\newline)) (eq c (char-code #\return))))
 
 (defun space? (c)
-  (not (eq nil (index-of c *SPACES*))))
+  (not (eq -1 (index-of c *SPACES*))))
 
 (defun digit? (c)
   (and (>= c (char-code #\0))
@@ -225,7 +232,9 @@
   )
 
 (defun read-token (str token-offset)
-  (let ((c (ptr-read-byte str)))
+  (let ((c (ptr-read-ubyte str)))
+    #-:sbcl
+    (format *standard-output* ";; read-token ~A ~x ~s~%" c (ptr-read-ulong str) str)
     (cond
       ((space? c) (read-token (+ 1 str) token-offset))
       ((digit? c) (read-signed-number str 0 *NUMBER-BASE* token-offset))
@@ -251,7 +260,6 @@
        (scan-list offset token-offset initiator terminator (+ 1 depth))) ; go down
       ((and (eq kind 'special) (eq value terminator))
        (if (<= depth 1)
-           (progn (format *standard-output* "  done~%")
-                  (values offset token-offset)) ; done
+           (values offset token-offset) ; done
            (scan-list offset token-offset initiator terminator (- depth 1)))) ; move back up
       (t (scan-list offset token-offset initiator terminator depth))))) ; keep reading

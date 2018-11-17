@@ -18,6 +18,7 @@
 (defvar *REGISTER-SIZE* *SIZEOF_LONG*)
 
 #+:sbcl (require "conditions")
+#+:repl (require "runtime/error")
 
 #+:sbcl
 (define-condition unknown-data-type-error (repl-error)
@@ -26,18 +27,20 @@
              (format stream "Unknown data type: ~A~%" (slot-value condition 'type)))))
 
 (defun type-atom? (type)
-  (or (eq type :pointer)
-      (eq type :byte)
-      (eq type :short)
-      (eq type :long)
-      (eq type :float)
-      (eq type :ubyte)
-      (eq type :ushort)
-      (eq type :ulong)))
+  (cond
+    ((eq type :pointer) t)
+    ((eq type :byte) t)
+    ((eq type :short) t)
+    ((eq type :long) t)
+    ((eq type :float) t)
+    ((eq type :ubyte) t)
+    ((eq type :ushort) t)
+    ((eq type :ulong) t)
+    (t nil)))
 
 (defun type-size (type)
   (cond
-    ((or (eq type :long) (eq type :ulong) (eq type :pointer))
+    ((or (eq type :long) (or (eq type :ulong) (eq type :pointer)))
      *SIZEOF_LONG*)
     ((or (eq type :short) (eq type :ushort))
      *SIZEOF_SHORT*)

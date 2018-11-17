@@ -75,7 +75,7 @@
 
 (defun package-symbol-gen (state)
   (multiple-value-bind (name offset)
-      (symbol-gen (package-string-segment-offset state))
+      (symbol-gen (package-string-segment-offset state) (package-string-segment-data state))
     (set-package-string-segment-offset state offset)
     name))
 

@@ -11,10 +11,13 @@
 #+:repl
 (defvar *MEMORY* 0)
 
+#+:repl (require "runtime/null")
 #+:repl (require "runtime/memory")
 #+:repl (require "runtime/math")
 #+:repl (require "runtime/string")
+#+:repl (require "runtime/error")
 
+#+:sbcl
 (defun zero? (c)
   (eq c 0))
 

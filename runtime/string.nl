@@ -22,8 +22,7 @@
     (if (zero? c)
         starting
         (progn
-          (if (is-downcase? c)
-              (ptr-write-ubyte (downcase-char c) str))
+          (ptr-write-ubyte (downcase-char c) str)
           (string-downcase (+ str 1) (or starting str))))))
 
 (defun downcase (c)
@@ -34,8 +33,7 @@
     (if (zero? c)
         starting
         (progn
-          (if (is-upcase? c)
-              (ptr-write-ubyte (upcase-char c) str))
+          (ptr-write-ubyte (upcase-char c) str)
           (string-upcase (+ str 1) (or starting str))))))
 
 (defun upcase (c)

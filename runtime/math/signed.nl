@@ -9,12 +9,26 @@
        (cls 7)
        (addi 1 14)))
 
-(def - (a)
-  (asm (load 0 0 11) 4
-       (neg 0)))
+(def + (a b c)
+  (asm (load 0 0 11) 12
+       (load 1 0 11) 8
+       (cls 7)
+       (addi 1 14)
+       (load 1 0 11) 4
+       (cls 7)
+       (addi 1 14)))
 
 (def - (a b)
   (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cls 7)
+       (subi 1 14)))
+
+(def - (a b c)
+  (asm (load 0 0 11) 12
+       (load 1 0 11) 8
+       (cls 7)
+       (subi 1 14)
        (load 1 0 11) 4
        (cls 7)
        (subi 1 14)))

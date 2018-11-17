@@ -1,5 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+#+:repl (require "runtime/logic")
 (require "memory")
 (require "type-sizes")
 (require "symbol")
@@ -29,7 +30,7 @@
 
 (defun env-push-alloc (bytes env)
   "Adds BYTES worth of space to the ENV stack returning the new address."
-  (let ((bytes (+ (align-bytes bytes *REGISTER-SIZE*))))
+  (let ((bytes (align-bytes bytes *REGISTER-SIZE*)))
     (format *standard-output* ";; Binding ~A bytes~%" bytes)
     (ptr-zero env bytes)
     (+ env bytes)))

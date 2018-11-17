@@ -89,3 +89,15 @@
 #+:sbcl
 (defun symbol-concat (&rest parts)
   (apply 'symbol-concat-pkg *package* parts))
+
+#+:sbcl
+(defun intern-keyword (str)
+  (if (symbolp str)
+      str
+      (intern (string-upcase str) "KEYWORD")))
+
+#-:sbcl
+(defun intern-keyword (str)
+  (with-allocation (buffer 128)
+    (ptr-write-string str buffer)
+    (intern (string-upcase buffer))))

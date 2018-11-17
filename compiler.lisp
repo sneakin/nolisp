@@ -38,14 +38,17 @@
   (multiple-value-bind (new-offset token-offset)
       (scan-list offset (package-string-segment-end package))
     (set-package-string-segment-offset package token-offset)
-    new-offset)
-)
+    new-offset))
 
 (defun gen-func-name (package func-name arity)
-  (with-allocation (buffer 36)
-    (package-intern package
-                  (concatenate 'string (ptr-read-string func-name) "/" (itoa arity buffer)))))
-
+  (if (string-position #\/ func-name)
+      func-name
+      (with-allocation (buffer 256)
+        (let ((next-buffer (string-concat func-name "/" buffer)))
+          (if (eq arity :any)
+              (ptr-write-string "any" (- next-buffer 1))
+              (itoa arity (- next-buffer 1)))
+          (package-intern package buffer)))))
 
 ;;; funcall
 
@@ -68,6 +71,7 @@
   "Try to resolve a function name in the lexical bindings and then the toplevel returning the DS or CS register and offset in that segment."
   (let* ((stack-pos (env-stack-position func-name env-start env))
          (func-name-arity (gen-func-name package func-name args))
+         ;; (func-name-any (gen-func-name package func-name :any))
          (data-pos (or (env-function-position func-name-arity
                                               (package-symbols-buffer package)
                                               (package-symbols-next-offset package))
@@ -107,7 +111,7 @@
 
 (defun compile-if-fixer (if-offset then-offset package start-offset asm-stack env-start env)
   (let ((offset-to-else (+ (- then-offset if-offset) *SIZEOF_LONG*))
-        (offset-to-end (+ (- asm-stack then-offset))))
+        (offset-to-end (- asm-stack then-offset)))
     (format *standard-output* ";; IF done ~A ~A ~A ~A ~A ~A~%" start-offset asm-stack if-offset then-offset offset-to-else offset-to-end)
     ;; correct the jump from the CMP to go to ELSE
     (ptr-write-long offset-to-else if-offset)
@@ -313,7 +317,7 @@
     (format *standard-output* ";; toplevel ~A ~A~%" n o-code-segment)
     (multiple-value-bind (offset asm-stack env kind value)
         (repl-compile-inner package start-offset str-end orig-asm-stack env-start env)
-      (if (and (eq kind 'eos))
+      (if (eq kind 'eos)
           ;; copy code to code-segment from asm-stack
           (let* ((asm-stack (emit-return asm-stack))
                  (cs (package-code-segment-offset package))
