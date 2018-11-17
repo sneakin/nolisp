@@ -3,6 +3,7 @@
 (require "runtime/eq")
 (require "runtime/cmp")
 (require "runtime/char")
+(require "runtime/bitops")
 
 (var *output-base* 10)
 
@@ -11,6 +12,19 @@
 
 (defun = (a b)
   (eq a b))
+
+(defun max (a b)
+  (if (> a b)
+      a
+      b))
+
+(defun min (a b)
+  (if (< a b)
+      a
+      b))
+
+(defun make-ulong (&optional (a 0) (b 0) (c 0) (d 255))
+  (logior a (logior (ash b 8) (logior (ash c 16) (ash d 24)))))
 
 (defun char-digit (n &optional (base *output-base*))
   (if (>=-unsigned n base)

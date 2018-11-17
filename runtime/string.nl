@@ -58,3 +58,14 @@
             t
             (string= (+ a 1) (+ b 1)))
         nil)))
+
+(defun string-position (char str &optional (n 0))
+  (let ((c (string-aref str n)))
+    (if (eq c char)
+        n
+        (if (zero? c)
+            -1
+            (string-position char str (+ n 1))))))
+
+(defun ptr-write-string (str ptr &optional (len (length str)))
+  (ptr-write-ubyte 0 (ptr-copy str ptr len)))
