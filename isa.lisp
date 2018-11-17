@@ -186,10 +186,12 @@
       acc))
 
 (defun dis-repl (op-fn data-fn data-type-fn seq &optional (offset 0))
-  (let* ((indexes (- (length seq) (* 3 *SIZEOF_LONG*)))
+  (let* ((indexes (- (length seq) (* 4 *SIZEOF_LONG*)))
          (code-segment (seq-read-long seq indexes))
          (strings (seq-read-long seq (+ *SIZEOF_LONG* indexes)))
-         (toplevel (seq-read-long seq (+ *SIZEOF_LONG* *SIZEOF_LONG* indexes))))
+         (toplevel (seq-read-long seq (+ *SIZEOF_LONG* *SIZEOF_LONG* indexes)))
+         (total-size (seq-read-long seq (+ *SIZEOF_LONG* *SIZEOF_LONG* *SIZEOF_LONG* indexes))))
+    (format *standard-output* "Disassembling ~A bytes~%~A~%" strings (list indexes code-segment strings toplevel total-size))
     (values (dis-repl-code op-fn data-fn data-type-fn (subseq seq 0 strings) offset)
             code-segment
             (listify-strings seq strings toplevel)

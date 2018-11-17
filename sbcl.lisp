@@ -24,6 +24,7 @@
 
 ;; todo need to also search multiple file directories
 (defconstant *repl-extensions* '("lisp" "nl"))
+(defvar *load-path* (list (directory ".")))
 
 (defun repl-resolve-path (mod-name &optional (extensions *repl-extensions*))
   (if extensions
