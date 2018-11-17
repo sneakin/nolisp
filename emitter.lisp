@@ -25,7 +25,8 @@
     ((eq op :NEG) (make-short 0 9 a b))
     ((eq op :RTI) (make-short 0 12 a b))
     ((eq op :BSR) (make-short 0 13 a b))
-    ((eq op :CLS) (make-short 0 #xe a b))
+    ((eq op :CLS) (make-short 0 #xE a b))
+    ((eq op :INTR) (make-short 0 #xF a b))
     ((eq op :INC) (make-short #x1 a b c))
     ((eq op :ADDI) (make-short #x2 #x1 a b))
     ((eq op :MODI) (make-short #x2 #x8 a b))
@@ -51,9 +52,13 @@
     ((eq op :CEILF) (make-short #x4 #x6 a b))
     ((eq op :LOAD) (make-short #x5 a b c))
     ((eq op :POP) (make-short #x6 a b c))
+    ((eq op :CIE) (make-short #x7 #x0 a b))
     ((eq op :CALL) (make-short #x7 #x7 a b))
+    ((eq op :SIE) (make-short #x7 #x8 a b))
+    ((eq op :SLEEP) (make-short #x7 #x9 a b))
     ((eq op :RET) (make-short #x7 #xc a b))
     ((eq op :RESET) (make-short #x7 #x1 a b))
+    ((eq op :CALLR) (make-short #x7 #xF a b))
     ((eq op :MOV) (make-short #x8 a b c))
     ((eq op :DEC) (make-short #x9 a b c))
     ((eq op :STORE) (make-short #xD a b c))
@@ -249,11 +254,18 @@
                asm-stack)
            :ret))
 
+(defun emit-isr-return (asm-stack)
+  (emit-op asm-stack :rti))
+
+#+:never
 (defun emit-reg-call (asm-stack reg)
   (emit-integer (emit-op (emit-op (emit-op asm-stack :cls #x7)
                                   :addi 10 14)
                          :call 0 reg)
                 0))
+
+(defun emit-reg-call (asm-stack reg)
+  (emit-op asm-stack :callr 10 reg))
 
 (defun emit-reg-jump (asm-stack reg)
   (format *standard-output* ";; reg-jump R~A~%" reg)
