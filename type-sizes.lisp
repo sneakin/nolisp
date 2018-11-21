@@ -3,6 +3,8 @@
 #+:sbcl
 (in-package :repl)
 
+(require "cpu")
+
 #+:repl (require "runtime/eq")
 #+:repl (require "runtime/logic")
 #+:repl (require "runtime/error")

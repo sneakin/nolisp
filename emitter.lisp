@@ -3,11 +3,9 @@
 (require "memory")
 (require "symbol")
 (require "string")
+(require "type-sizes")
 
 (in-package :repl)
-
-(defvar *REGISTER-SIZE* *SIZEOF_LONG*)
-(defvar *REGISTER-COUNT* 16)
 
 (defun make-short (&optional a b c d)
   (logior (or a 0)
