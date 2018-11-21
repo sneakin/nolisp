@@ -6,6 +6,9 @@
 (defun sleep ()
   (asm (sleep)))
 
+(defun cpu-status ()
+  (asm (mov 0 14)))
+
 (defun clear-status-bit (mask)
   (asm (load 1 0 11) 4
        (not 1 1)

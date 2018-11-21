@@ -6,6 +6,9 @@
 
 (in-package :repl)
 
+(defvar *REGISTER-SIZE* *SIZEOF_LONG*)
+(defvar *REGISTER-COUNT* 16)
+
 (defun make-short (&optional a b c d)
   (logior (or a 0)
           (ash (or b 0) 4)
@@ -15,7 +18,7 @@
 (defun make-op (op &optional a b c)
   (cond
     ((eq op :NOP) (make-short 0 0 a b))
-    ((eq op :NOT) (make-short 0 1 a 0))
+    ((eq op :NOT) (make-short 0 1 a b))
     ((eq op :OR) (make-short 0 2 a b))
     ((eq op :XOR) (make-short 0 3 a b))
     ((eq op :AND) (make-short 0 4 a b))
@@ -251,7 +254,22 @@
                asm-stack)
            :ret))
 
+(defun emit-save-context (asm-stack &optional (reg 0))
+  (if (< reg *REGISTER-COUNT*)
+      (emit-save-context (emit-push asm-stack reg) (+ 1 reg))
+      asm-stack))
+
+(defun emit-restore-context (asm-stack &optional (reg *REGISTER-COUNT*))
+  (if (> reg 0)
+      (let ((next-reg (- reg 1)))
+        (emit-restore-context (emit-pop asm-stack next-reg) next-reg))
+      asm-stack))
+
+(defun emit-isr-prolog (asm-stack)
+  (emit-save-context asm-stack))
+
 (defun emit-isr-return (asm-stack)
+  (emit-restore-context asm-stack)
   (emit-op asm-stack :rti))
 
 #+:never

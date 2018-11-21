@@ -14,9 +14,10 @@
 (defun interrupts-offset (n)
   (+ (interrupts-addr) (* n *SIZEOF-ISR*)))
 
-(defun interrupts-install (n handler)
-  (ptr-write-ushort 0 (ptr-write-ulong (+ handler (code-segment))
-                                       (ptr-write-ushort interrupts-isr-asm (interrupts-offset n)))))
+(defun interrupts-enabled? ()
+  (asm (mov 0 14)
+       (load 1 0 15) #x10
+       (and 1)))
 
 (defun interrupts-enable ()
   (asm (sie))
@@ -25,6 +26,14 @@
 (defun interrupts-disable ()
   (asm (cie))
   t)
+
+(defun interrupts-install (n handler)
+  (let ((en (interrupts-enabled?)))
+    (if en (interrupts-disable))
+    (ptr-write-ushort 0 (ptr-write-ulong (+ handler (code-segment))
+                                         (ptr-write-ushort interrupts-isr-asm (interrupts-offset n))))
+    (if en (interrupts-enable))
+    n))
 
 (defun interrupts-return ()
   ;; todo needs to get the stack back to how it was when the interrupt was entered

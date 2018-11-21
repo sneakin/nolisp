@@ -690,16 +690,17 @@
 
 (defun compile-isr-body (package start-offset str-end orig-asm-stack env-start env func-name)
   ;; compiles a function's body binding it to func-name
+  (format *standard-output* ";; ISR body ~A~%" (symbol-string func-name))
   (multiple-value-bind (offset asm-stack env kind value)
       (compile-progn package
                      start-offset
                      str-end
-                     orig-asm-stack
+                     (emit-isr-prolog orig-asm-stack)
                      env
                      env
                      nil
                      0)
-    (format *standard-output* ";; ISR closing ~A~%" (symbol-string func-name))
+    (format *standard-output* ";; ISR body closing ~A~%" (symbol-string func-name))
     (let* ((asm-stack (emit-isr-return asm-stack))
            (cs (package-code-segment-offset package)))
       ;; copy code from asm-stack to code-segment
