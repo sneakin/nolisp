@@ -3,8 +3,8 @@
 (require "runtime/memory")
 (require "runtime/string")
 (require "runtime/itoa")
+(require "runtime/bc/address-map")
 
-(var output-dev-base-addr #xF0002000)
 (var output-dev-memory-size 1024)
 (var output-dev-eos-addr output-dev-base-addr)
 (var output-dev-cmd-addr (+ output-dev-eos-addr 4))

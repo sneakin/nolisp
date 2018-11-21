@@ -5,8 +5,8 @@
 (require "runtime/math")
 (require "runtime/cmp")
 (require "runtime/halt")
+(require "runtime/bc/address-map")
 
-(var input-dev-base-addr #xF0003000)
 (var input-dev-memory-size 1024)
 (var input-dev-read-addr input-dev-base-addr)
 (var input-dev-eos-addr (+ input-dev-read-addr 4))

@@ -3,8 +3,8 @@
 (require "runtime/memory")
 (require "runtime/string")
 (require "runtime/itoa")
+(require "runtime/bc/address-map")
 
-(var console-base-addr #xF0000800)
 (var console-memory-size 1024)
 (var console-buffer-addr console-base-addr)
 (var console-flush-addr (+ console-base-addr console-memory-size))
