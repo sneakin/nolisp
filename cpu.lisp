@@ -1,4 +1,2 @@
-(in-package :repl)
-
-(defvar *REGISTER-SIZE* *SIZEOF_LONG*)
-(defvar *REGISTER-COUNT* 16)
+#-:repl (in-package :repl)
+(require "runtime/bc/cpu")
