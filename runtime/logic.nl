@@ -8,11 +8,13 @@
 (defun or (a b)
   (if a a b))
 
-(defun or (a b c)
+(defun or (a b &optional c d e)
   (cond
     (a t)
     (b t)
     (c t)
+    (d t)
+    (e t)
     (t nil)))
 
 (defun and (a b)

@@ -7,6 +7,8 @@
 
 (in-package :repl)
 
+(require "runtime/bc/cpu")
+
 (defun make-short (&optional a b c d)
   (logior (or a 0)
           (ash (or b 0) 4)
@@ -253,11 +255,14 @@
            :ret))
 
 (defun emit-save-context (asm-stack &optional (reg 0))
-  (if (< reg *REGISTER-COUNT*)
-      (emit-save-context (emit-push asm-stack reg) (+ 1 reg))
+  (if (< reg *REGISTER-SP*)
+      (emit-save-context (if (system-register? reg)
+                             asm-stack
+                             (emit-push asm-stack reg))
+                         (+ 1 reg))
       asm-stack))
 
-(defun emit-restore-context (asm-stack &optional (reg *REGISTER-COUNT*))
+(defun emit-restore-context (asm-stack &optional (reg *REGISTER-SP*))
   (if (> reg 0)
       (let ((next-reg (- reg 1)))
         (emit-restore-context (emit-pop asm-stack next-reg) next-reg))
@@ -267,8 +272,7 @@
   (emit-save-context asm-stack))
 
 (defun emit-isr-return (asm-stack)
-  (emit-restore-context asm-stack)
-  (emit-op asm-stack :rti))
+  (emit-op (emit-restore-context asm-stack) :rti))
 
 #+:never
 (defun emit-reg-call (asm-stack reg)
@@ -386,6 +390,5 @@
         1)    
        0)
       :halt)
-     (- string-segment-jump *SIZEOF_LONG*))
-    ))
+     (- string-segment-jump *SIZEOF_LONG*))))
 

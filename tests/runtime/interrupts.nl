@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (require "runtime/bc/io/console")
 (require "runtime/interrupts")
 (require "runtime/halt")
@@ -16,6 +18,10 @@
                         (interrupts-return)))
 (interrupts-install 3 (isr
                         (console-write "Interrupted 3!")))
+(interrupts-install 9 (isr
+                        (console-write "Interrupted by keyboard!")))
+(interrupts-install 10 (isr
+                        (console-write "Interrupted by gfx!")))
 (interrupts-install 128 (isr
                        (let ((x (+ 1 2)))
                          (console-write "Interrupted 128!")
@@ -43,6 +49,7 @@
                                         ;(interrupt 3)
 (interrupt 2)
 (asm (int 128))
+(console-write "Sleep time")
 (asm (sleep))
 (console-write "Wakey wakey")
 (asm (reset))

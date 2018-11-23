@@ -1,2 +1,17 @@
 (defvar *REGISTER-SIZE* 4)
 (defvar *REGISTER-COUNT* 16)
+
+(defvar *REGISTER-INS* 15)
+(defvar *REGISTER-STATUS* 14)
+(defvar *REGISTER-ISR* 13)
+(defvar *REGISTER-IP* 12)
+(defvar *REGISTER-SP* 11)
+(defvar *REGISTER-CS* 10)
+(defvar *REGISTER-DS* 9)
+
+(defun system-register? (reg)
+  (or (eq reg *REGISTER-INS*)
+      (eq reg *REGISTER-STATUS*)
+      (eq reg *REGISTER-ISR*)
+      (eq reg *REGISTER-IP*)
+      (eq reg *REGISTER-SP*)))
