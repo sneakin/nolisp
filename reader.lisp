@@ -247,7 +247,7 @@
       ((eq c (char-code #\;)) (read-token (read-comment (+ 1 str)) token-offset))
       ((special? c) (values 'special c (+ 1 str) token-offset))
       ((zero? c) (values 'eos nil (+ 1 str) token-offset))
-      (t (values 'unknown nil (+ 1 str) token-offset)))))
+      (t (values 'unknown c (+ 1 str) token-offset)))))
 
 (defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
   (multiple-value-bind (kind value offset new-token-offset)
