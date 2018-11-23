@@ -7,7 +7,7 @@
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.
 #+:sbcl
-(defvar *MEMORY* (make-array (* 256 1024 8) :element-type '(unsigned-byte 8)))
+(defvar *MEMORY* (make-array (* 1024 1024 8) :element-type '(unsigned-byte 8)))
 #+:repl
 (defvar *MEMORY* 0)
 
