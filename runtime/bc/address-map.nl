@@ -5,6 +5,7 @@
 (defvar console-base-addr #xF0001000)
 (defvar timer-base-addr #xF0002000)
 (defvar timer-interrupt 11)
+(defvar rtc-base-addr #xF0005000)
 
 ;;; CLI Devices
 
