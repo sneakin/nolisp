@@ -3,6 +3,8 @@
 (require "runtime/memory")
 (require "runtime/string")
 (require "runtime/itoa")
+(require "runtime/halt")
+(require "runtime/interrupts")
 (require "runtime/bc/address-map")
 
 (var output-dev-memory-size 1024)
@@ -10,6 +12,12 @@
 (var output-dev-cmd-addr (+ output-dev-eos-addr 4))
 (var output-dev-buffer-addr (+ output-dev-cmd-addr 4))
 (var output-dev-flush-addr (+ output-dev-buffer-addr output-dev-memory-size))
+
+(define-isr output-dev-isr
+    (wakeup))
+
+(defun output-dev-init ()
+  (interrupts-install output-dev-interrupt output-dev-isr))
 
 (defun output-dev-write-string (str &optional (n (length str)))
   (let ((num (if (> n output-dev-memory-size)
@@ -21,13 +29,15 @@
 (defun output-dev-eos ()
   (ptr-read-ulong output-dev-eos-addr))
 
-(defun output-dev-wait ()
+(defun output-dev-wait (&optional (disabled (not (interrupts-enabled?))))
   (if (= (output-dev-eos) 0) ;; EOS == ok
       t
       (if (= (output-dev-eos) 4) ;; EOS == FULL
           (progn
+            (interrupts-enable)
             (sleep)
-            (output-dev-wait))
+            (if disabled (interrupts-disable))
+            (output-dev-wait disabled))
           nil)))
 
 #+:never

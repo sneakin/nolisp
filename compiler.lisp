@@ -289,15 +289,11 @@
       ((and (eq kind 'special) (eq value (char-code #\()))
        (multiple-value-bind (offset asm-stack env)
            (compile-let-binding num package offset str-end asm-stack env-start env)
-         (compile-let-bindings (+ 1 num) package offset str-end asm-stack env-start env tail-call return-offset))
-       )
+         (compile-let-bindings (+ 1 num) package offset str-end asm-stack env-start env tail-call return-offset)))
       ((and (eq kind 'special) (eq value (char-code #\))))
        (format *standard-output* ";; Let body, ~A bindings~%" num)
-       (compile-body num package offset str-end asm-stack env-start env tail-call return-offset)
-       )
-      (t (error 'malformed-let-error :offset start-offset)))
-    )
-  )
+       (compile-body num package offset str-end asm-stack env-start env tail-call return-offset))
+      (t (error 'malformed-let-error :offset start-offset :token-kind kind :token-value value)))))
 
 (defun compile-let (package start-offset str-end asm-stack env-start env tail-call return-offset)
   ;; for each binding, compile and push the value, then push the name's symbol value to env
@@ -333,8 +329,7 @@
                     env))
           (if (eq kind nil)
               (compile-toplevel package offset str-end asm-stack env-start env (+ 1 n) (or starting-code-segment o-code-segment) (or starting-asm-stack orig-asm-stack))
-              (error 'invalid-token-error :offset start-offset :kind kind :value value)))))
-  )
+              (error 'invalid-token-error :offset start-offset :kind kind :value value))))))
 
 ;;;
 ;;; Lambda

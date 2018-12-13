@@ -59,7 +59,7 @@
              (format-ptr (ptr-write-ubyte #\~ buffer)
                          (+ str percent 2) a b c d e f g))
             ((eq spec (char-code #\%))
-             (format-ptr (ptr-write-ubyte #\newline buffer)
+             (format-ptr (ptr-write-ubyte #\newline (ptr-write-ubyte #\return buffer))
                          (+ str percent 2) a b c d e f g))
             (t (format-ptr (cond
                              ((eq spec (char-code #\c)) (ptr-write-ubyte a buffer))

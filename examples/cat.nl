@@ -8,9 +8,14 @@
   (if (and (input-dev-eos) (eq 0 (input-dev-bytes-read)))
       0
       (progn
-        (output-dev-write input-dev-buffer-buffer-addr (input-dev-bytes-read))
+        (output-dev-write input-dev-buffer-addr (input-dev-bytes-read))
         (input-dev-wait)
         (print-input))))
 
-(print-input)
+(defun main ()
+  (input-dev-init)
+  (output-dev-init)
+  (print-input))
+
+(main)
 

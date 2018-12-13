@@ -5,14 +5,20 @@
 (require "runtime/math")
 (require "runtime/cmp")
 (require "runtime/halt")
+(require "runtime/interrupts")
 (require "runtime/bc/address-map")
 
 (var input-dev-memory-size 1024)
 (var input-dev-read-addr input-dev-base-addr)
 (var input-dev-eos-addr (+ input-dev-read-addr 4))
-(var input-dev-buffer-read-offset-addr (+ input-dev-eos-addr 4))
-(var input-dev-buffer-write-offset-addr (+ input-dev-buffer-read-offset-addr 4))
-(var input-dev-buffer-buffer-addr (+ input-dev-eos-addr 4))
+(var input-dev-buffer-addr (+ input-dev-eos-addr 4))
+(var input-dev-terminator-addr (+ input-dev-buffer-addr input-dev-memory-size))
+
+(define-isr input-dev-isr
+    (wakeup))
+
+(defun input-dev-init ()
+  (interrupts-install input-dev-interrupt input-dev-isr))
 
 (defun input-dev-bytes-read ()
   (ptr-read-ulong input-dev-read-addr))
@@ -24,7 +30,7 @@
   (> (input-dev-bytes-read) 0))
 
 (defun input-dev-get (offset)
-  (ptr-read-ubyte (+ input-dev-buffer-buffer-addr offset)))
+  (ptr-read-ubyte (+ input-dev-buffer-addr offset)))
 
 (var input-dev-next-byte 0)
 
@@ -35,13 +41,15 @@
         t)))
 
 ;; todo wait using SLEEP and interrupt
-(defun input-dev-wait-loop ()
+(defun input-dev-wait-loop (&optional (disabled (not (interrupts-enabled?))))
   (if (or (> (input-dev-bytes-read) 0)
           (input-dev-eos))
       t
       (progn
+        (interrupts-enable)
         (sleep)
-        (input-dev-wait-loop))))
+        (if disabled (interrupts-disable))
+        (input-dev-wait-loop disabled))))
 
 (defun input-dev-wait ()
   (input-dev-read-more)
@@ -65,5 +73,5 @@
           (not (input-dev-ready)))
       nil
       (progn
-        (ptr-write-ubyte 0 (ptr-copy input-dev-buffer-buffer-addr dest (input-dev-bytes-read)))
+        (ptr-write-ubyte 0 (ptr-copy input-dev-buffer-addr dest (input-dev-bytes-read)))
         dest)))

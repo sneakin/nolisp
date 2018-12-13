@@ -206,7 +206,6 @@
 
 (defun read-character (str token-offset &optional char)
   (let ((c (ptr-read-byte str)))
-    (format *standard-output* "char ~A ~A ~%" c (if char (code-char char)))
     (cond
       (char (if (and (symbol-char? char) (symbol-char? c))
                 (read-character-symbol (- str 1) token-offset)

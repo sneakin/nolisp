@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (defvar *REGISTER-SIZE* 4)
 (defvar *REGISTER-COUNT* 16)
 
@@ -10,8 +12,10 @@
 (defvar *REGISTER-DS* 9)
 
 (defun system-register? (reg)
-  (or (eq reg *REGISTER-INS*)
-      (eq reg *REGISTER-STATUS*)
-      (eq reg *REGISTER-ISR*)
-      (eq reg *REGISTER-IP*)
-      (eq reg *REGISTER-SP*)))
+  (cond
+    ((eq reg *REGISTER-INS*) t)
+    ((eq reg *REGISTER-STATUS*) t)
+    ((eq reg *REGISTER-ISR*) t)
+    ((eq reg *REGISTER-IP*) t)
+    ((eq reg *REGISTER-SP*) t)
+    (t nil)))
