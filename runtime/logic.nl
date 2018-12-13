@@ -10,11 +10,11 @@
 
 (defun or (a b &optional c d e)
   (cond
-    (a t)
-    (b t)
-    (c t)
-    (d t)
-    (e t)
+    (a a)
+    (b b)
+    (c c)
+    (d d)
+    (e e)
     (t nil)))
 
 (defun and (a b)
