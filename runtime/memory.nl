@@ -108,6 +108,22 @@
         (ptr-set-ulong (+ offset *SIZEOF_LONG*) (- count 1) value))
       offset))
 
+#+:repl
+(defun ptr-read-ptr (ptr)
+  (ptr-read-ulong ptr))
+
+#+:repl
+(defun ptr-write-ptr (value offset)
+  (ptr-write-ulong value offset))
+
+#+:repl
+(defun ptr-read-pointer (ptr)
+  (ptr-read-ulong ptr))
+
+#+:repl
+(defun ptr-write-pointer (value offset)
+  (ptr-write-ulong value offset))
+
 (defun ptr-set (offset count &optional (value 0))
   (if (> count 4)
       (progn

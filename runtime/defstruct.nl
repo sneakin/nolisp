@@ -5,6 +5,10 @@
 
 (in-package :repl)
 
+(define-condition slot-error (simple-error)
+  ((slot :initform nil :initarg :slot)
+   (struct :initform nil :initarg :struct)))
+
 (defun slot-def-assoc (key fields)
   (if fields
       (if (eq (first fields) key)
@@ -170,4 +174,3 @@
      ,(gen-struct-init name slots)
      ;(defconstant ,name ',(symbol-concat name "-init"))
      ))
-

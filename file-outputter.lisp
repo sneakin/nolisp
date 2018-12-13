@@ -36,9 +36,10 @@
                    (package-symbols-next-offset state)
                    data-segment-offset)))
 
-(defun repl-file (path &optional (data-segment-offset 0) (output-path (concatenate 'string path ".bin")) (buffer-size (ceiling (/ (length *memory*) 8))) (offset 0))
+(defun repl-file (path &optional (data-segment-offset 0) (output-path (concatenate 'string path ".bin")) (buffer-size (ceiling (/ (length *memory*) 16))) (offset 0))
   (let ((str-end (ptr-read-file path offset)))
     (with-allocation (state (package-size))
+      (format *standard-output* "Package Address: ~A~%" state)
       (package-init state
                     (+ offset (* buffer-size 1))
                     buffer-size
@@ -47,14 +48,20 @@
                     (+ offset (* buffer-size 3))
                     buffer-size
                     (+ offset (* buffer-size 4))
+                    buffer-size
+                    (+ offset (* buffer-size 5))
+                    buffer-size
+                    (+ offset (* buffer-size 6))
+                    buffer-size
+                    (+ offset (* buffer-size 7))
                     buffer-size)
       (compile-to-file output-path
                        state
-                       (+ offset (* buffer-size 5))
+                       (+ offset (* buffer-size 8))
                        0
                        str-end
-                       (+ offset (* buffer-size 6))
-                       (+ offset (* buffer-size 7))
-                       (+ (+ offset (* buffer-size 7)) 4)
+                       (+ offset (* buffer-size 9))
+                       (+ offset (* buffer-size 10))
+                       (+ (+ offset (* buffer-size 10)) 4)
                        data-segment-offset))))
 

@@ -14,7 +14,10 @@
       (format stream ": ~A~%" (slot-value condition 'msg))
       (format stream "~%"))
   (if (slot-value condition 'offset)
-      (format stream "~A~%" (ptr-read-string (- (slot-value condition 'offset) 32) 160))))
+      (progn
+        (format stream "Memory:~%~A~%" (ptr-read-string (- (slot-value condition 'offset) 32) 32))
+        (format stream "> ~A~%" (ptr-read-string (slot-value condition 'offset) 160)))))
+
 
 #+:sbcl
 (define-condition unknown-op-error (repl-error)

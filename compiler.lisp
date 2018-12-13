@@ -1013,6 +1013,35 @@
           (error 'malformed-error :offset start-offset)
           (compile-require-it path package offset str-end asm-stack env-start env)))))
 
+;;; external imports
+(defun compile-import-list (lib package start-offset str-end asm-stack env-start env)
+  (multiple-value-bind (kind fun-name offset)
+      (compile-read-token package start-offset)
+    (cond
+      ((and (eq kind 'special)
+            (eq fun-name (char-code #\))))
+       (values offset asm-stack env))
+      ((or (eq kind 'symbol) (eq kind 'string))
+       (format *standard-output* ";;  ~A~%" (ptr-read-string fun-name))
+       (package-import package lib fun-name)
+       (compile-import-list lib package offset str-end asm-stack env-start env))
+      (t (error 'malformed-error :offset start-offset)))))
+
+(defun compile-import (package start-offset str-end asm-stack env-start env)
+  (multiple-value-bind (kind lib offset)
+      (compile-read-token package start-offset)
+    (if (not  (or (eq kind 'symbol)
+                  (eq kind 'string)))
+        (error 'malformed-error :offset start-offset))
+    (format *standard-output* ";; importing from ~A~%" (ptr-read-string lib))
+    (compile-import-list (package-require-lib package lib)
+                         package
+                         offset
+                         str-end
+                         asm-stack
+                         env-start
+                         env)))
+
 ;;; defmacro
 
 (defun compile-defmacro (start-offset str-end asm-stack env-start env)
@@ -1050,6 +1079,7 @@
       ((string-equal sym "progn") t)
       ((string-equal sym "with-allocation") t)
       ((string-equal sym "require") t)
+      ((string-equal sym "import") t)
       (t nil))))
 
 (defun compile-special-form (form package offset str-end asm-stack env-start env tail-call return-offset)
@@ -1089,6 +1119,8 @@
        (compile-with-allocation package offset str-end asm-stack env-start env tail-call return-offset))
       ((string-equal form-str "require")
        (compile-require package offset str-end asm-stack env-start env))
+      ((string-equal form-str "import")
+       (compile-import package offset str-end asm-stack env-start env))
       (t (error 'unknown-special-form-error :offset offset :form form-str)))))
 
 ;;; Calls

@@ -74,6 +74,7 @@
            :compile-to-file
            :repl-file
            :disassmble-asm
+           :repl-defstruct
            ))
 
 #+:sbcl

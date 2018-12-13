@@ -36,6 +36,10 @@
   (+ ptr 1))
 
 #+:sbcl
+(defun ptr-write-ubyte (c ptr)
+  (ptr-write-byte c ptr))
+
+#+:sbcl
 (defun ptr-write-char (c ptr)
   (ptr-write-byte (char-code c) ptr))
 
@@ -77,6 +81,15 @@
   (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr)))
 
 #+:sbcl
+(defun ptr-write-ushort (n ptr)
+  (ptr-write-short n ptr))
+
+#+:sbcl
+(defun make-ushort (a b)
+  (logior a
+          (ash b 8)))
+
+#+:sbcl
 (defun make-ulong (a b c d)
   (logior a
           (ash b 8)
@@ -84,11 +97,33 @@
           (ash d 24)))
 
 #+:sbcl
+(defun make-ulong64 (a b c d e f g h)
+  (logior a
+          (ash b 8)
+          (ash c 16)
+          (ash d 24)
+          (ash e 32)
+          (ash f 40)
+          (ash g 48)
+          (ash h 56)))
+
+#+:sbcl
 (defun ptr-read-ulong (ptr)
   (make-ulong (ptr-read-byte ptr)
               (ptr-read-byte (+ ptr 1))
               (ptr-read-byte (+ ptr 2))
               (ptr-read-byte (+ ptr 3))))
+
+#+:sbcl
+(defun ptr-read-ulong64 (ptr)
+  (make-ulong64 (ptr-read-byte ptr)
+                (ptr-read-byte (+ ptr 1))
+                (ptr-read-byte (+ ptr 2))
+                (ptr-read-byte (+ ptr 3))
+                (ptr-read-byte (+ ptr 4))
+                (ptr-read-byte (+ ptr 5))
+                (ptr-read-byte (+ ptr 6))
+                (ptr-read-byte (+ ptr 7))))
 
 #+:sbcl
 (defun ptr-read-long (ptr)
@@ -106,13 +141,50 @@
   (ptr-write-byte (mask-ulong 3 n) (+ 3 ptr)))
 
 #+:sbcl
-(defun ptr-write-string (str ptr)
+(defun ptr-write-ulong (n ptr)
+  (ptr-write-long n ptr))
+
+#+:sbcl
+(defun ptr-write-long64 (n ptr)
+  (if (eq n nil) (setf n 0))
+  (ptr-write-byte (mask-ulong 0 n) ptr)
+  (ptr-write-byte (mask-ulong 1 n) (+ 1 ptr))
+  (ptr-write-byte (mask-ulong 2 n) (+ 2 ptr))
+  (ptr-write-byte (mask-ulong 3 n) (+ 3 ptr))
+  (ptr-write-byte (mask-ulong 4 n) (+ 4 ptr))
+  (ptr-write-byte (mask-ulong 5 n) (+ 5 ptr))
+  (ptr-write-byte (mask-ulong 6 n) (+ 6 ptr))
+  (ptr-write-byte (mask-ulong 7 n) (+ 7 ptr)))
+
+#+:sbcl
+(defun ptr-write-ulong64 (n ptr)
+  (ptr-write-long64 n ptr))
+
+#+:sbcl
+(defun ptr-write-ptr (n ptr)
+  (ptr-write-ulong n ptr))
+
+#+:sbcl
+(defun ptr-write-pointer (n ptr)
+  (ptr-write-ulong n ptr))
+
+#+:sbcl
+(defun ptr-read-ptr (ptr)
+  (ptr-read-ulong ptr))
+
+#+:sbcl
+(defun ptr-read-pointer (ptr)
+  (ptr-read-ulong ptr))
+
+#+:sbcl
+(defun ptr-write-string (str ptr &optional (limit (if (not (numberp str))
+                                                      (length str))))
   (if (numberp str)
       (ptr-write-string (ptr-read-string str) ptr)
       (progn
-        (dotimes (n (length str))
+        (dotimes (n (min limit (length str)))
           (ptr-write-byte (char-code (aref str n)) (+ n ptr)))
-        (ptr-write-byte 0 (+ (length str) ptr)))))
+        (ptr-write-byte 0 (+ (min limit (length str)) ptr)))))
 
 #+:repl
 (defun string-length (str &optional (n 0))
@@ -144,7 +216,7 @@
 (defun ptr-read-string (ptr &optional count acc (n 0))
   (if (stringp ptr)
       ptr
-      (ptr-read-string-loop ptr count acc n)))
+      (ptr-read-string-loop ptr count "" n)))
 
 #+:repl
 (defun ptr-read-string (ptr &optional count acc (n 0))
@@ -252,7 +324,10 @@
       (t (pointer-of needle (+ 1 haystack))))))
 
 (defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
-  (* (ceiling (/ bytes alignment)) alignment))
+  (if (and (> bytes 0)
+           (> alignment 0))
+      (* (ceiling (/ bytes alignment)) alignment)
+      0))
 
 #+:sbcl
 (defvar *allocate-next-offset* (- (length *MEMORY*) 1))

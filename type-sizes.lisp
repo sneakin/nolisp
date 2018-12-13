@@ -16,6 +16,8 @@
 (defvar *SIZEOF_POINTER* 4)
 (defvar *SIZEOF_LONG* 4)
 (defvar *SIZEOF_ULONG* 4)
+(defvar *SIZEOF_LONG64* 8)
+(defvar *SIZEOF_ULONG64* 8)
 (defvar *SIZEOF_FLOAT* 4)
 
 #+:sbcl (require "conditions")
@@ -33,14 +35,18 @@
     ((eq type :byte) t)
     ((eq type :short) t)
     ((eq type :long) t)
+    ((eq type :long64) t)
     ((eq type :float) t)
     ((eq type :ubyte) t)
     ((eq type :ushort) t)
     ((eq type :ulong) t)
+    ((eq type :ulong64) t)
     (t nil)))
 
 (defun type-size (type)
   (cond
+    ((or (eq type :long64) (eq type :ulong64))
+     *SIZEOF_LONG64*)
     ((or (eq type :long) (or (eq type :ulong) (eq type :pointer)))
      *SIZEOF_LONG*)
     ((or (eq type :short) (eq type :ushort))
