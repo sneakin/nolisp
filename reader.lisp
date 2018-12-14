@@ -226,6 +226,8 @@
       ((eq c (char-code #\-)) (values 'condition nil str token-offset))
       ;; anything else
       ;; todo lookup in table
+      ((eq c (char-code #\:)) (read-symbol str token-offset))
+      ((eq c (char-code #\')) (read-symbol (+ 1 str) token-offset))
       (t (error 'invalid-character-error :offset str :char c))
       ))
   )
