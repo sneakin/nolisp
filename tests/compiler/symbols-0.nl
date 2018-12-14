@@ -1,5 +1,11 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "runtime")
+(require "symbol")
+(require "runtime/string")
+
+(require "runtime/bc/io/console")
+
 (console-write-unsigned-integer *string-segment*)
 (console-write "Hello:\n")
 (console-write-unsigned-integer "Hello:\n")
