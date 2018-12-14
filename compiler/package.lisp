@@ -7,7 +7,7 @@
 (require "compiler/symbol-index")
 (require "compiler/imports-list")
 
-(in-package :repl)
+#-:repl (in-package :repl)
 
 (defvar *INIT-FUNC* "__init")
 

@@ -2,7 +2,9 @@
 ;;; Memory
 
 (require "type-sizes")
-(in-package :repl)
+#+:repl (require "runtime/number")
+
+#-:repl (in-package :repl)
 
 ;;; All input comes in through *MEMORY* and any array values like symbols
 ;;; get written to *MEMORY* as well.

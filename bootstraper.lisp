@@ -1,3 +1,5 @@
+;;; -*- mode: Lisp; coding: utf-8-unix -*-
+
 (in-package :repl)
 
 (defun bootstrap-eval (exp)
@@ -6,6 +8,8 @@
     ((atom exp) nil)
     ((eq (first exp) 'repl-defstruct) (macroexpand exp))
     ((eq (first exp) 'cl-user::repl-defstruct) (macroexpand exp))
+    ((eq (first exp) 'defenum) (macroexpand exp))
+    ((eq (first exp) 'cl-user::defenum) (macroexpand exp))
     ))
 
 (defun bootstrap-stream (stream &optional expansions)
@@ -26,7 +30,14 @@
   (with-open-file (stream path :direction :output
                           :if-exists :supersede)
     (mapcar #'(lambda (exp)
-                (write exp :stream stream))
+                (if (and (listp exp) (eq (first exp) 'progn))
+                    (mapcar #'(lambda (exp)
+                                (write exp :stream stream)
+                                (format stream "~%"))
+                            (rest exp))
+                    (progn
+                      (write exp :stream stream)
+                      (format stream "~%"))))
             (remove-if #'null exps))))
 
 (defun bootstrap-gen (source-files)
@@ -39,4 +50,5 @@
 (bootstrap-gen '(("compiler/package.lisp" "bootstrap/package.nl")
                  ("compiler/byte-buffer.lisp" "bootstrap/byte-buffer.nl")
                  ("compiler/symbol-index.lisp" "bootstrap/symbol-index.nl")
-                 ("compiler/imports-list.lisp" "bootstrap/imports-list.nl")))
+                 ("compiler/imports-list.lisp" "bootstrap/imports-list.nl")
+                 ("logging.lisp" "bootstrap/logging.nl")))
