@@ -1228,7 +1228,7 @@
        ;; todo move to read-token? messes with tail call detection otherwise
        (compile-conditional value offset package str-end asm-stack env-start env))
       ((and (eq kind 'symbol) (keyword? value))
-       (values offset (emit-value asm-stack 'integer value) env))
+       (values offset (emit-string-value asm-stack value package) env))
       ((eq kind 'symbol)
        (values offset (emit-lookup asm-stack value env-start env (package-symbols package)) env))
       ((and (eq kind 'special) (eq value (char-code #\()))

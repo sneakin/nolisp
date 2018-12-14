@@ -9,12 +9,25 @@
 #+:repl
 (defun set-package-string-segment-position (obj n))
 
+#+:repl
+(defun symbolp (ptr)
+  t)
+
+(defun keyword? (sym)
+  (eq (ptr-read-byte sym)
+      (char-code #\:)))
+
+#+:repl
+(defun keywordp (sym)
+  (keyword? sym))
+
 (defun symbol-string (symbol-offset)
   (if symbol-offset
-      (ptr-read-string symbol-offset)))
+      (ptr-read-string (if (keyword? symbol-offset)
+                           (+ 1 symbol-offset)
+                           symbol-offset))))
 
 (defun symbol-id (symbol-offset &optional (segment (package-string-segment-data *COMPILER*)))
-  ;; (format *standard-output* ";; finding symbol ~A ~A in ~A~%" symbol-offset (symbol-string symbol-offset) segment)
   (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
 
 #+:repl
@@ -24,14 +37,6 @@
 #+:repl
 (defun symbolp (ptr)
   (> ptr (package-string-segment-data *COMPILER*)))
-
-(defun keyword? (sym)
-  (eq (ptr-read-byte sym)
-      (char-code #\:)))
-
-#+:repl
-(defun keywordp (sym)
-  (keyword? sym))
 
 (defun symbol-has-arity? (sym)
   (if (eq (ptr-read-byte sym) (char-code #\/))
