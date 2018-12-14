@@ -8,6 +8,9 @@
 (require "runtime/cmp")
 (require "runtime/number")
 
+(defun stringp (str)
+  t)
+
 (defun length (str &optional (n 0))
   (if str
       (if (eq (ptr-read-ubyte str) 0)

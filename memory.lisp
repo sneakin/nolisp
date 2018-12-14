@@ -221,12 +221,8 @@
       (ptr-read-string-loop ptr count "" n)))
 
 #+:repl
-(defun ptr-read-string (ptr &optional count acc (n 0))
-  (let* ((c (ptr-read-byte ptr)))
-    (if (or (and count (>= n count)) (zero? c))
-        acc
-        (progn
-          (ptr-read-string (+ 1 ptr) count (ptr-write-byte c acc) (+ 1 n))))))
+(defun ptr-read-string (ptr &optional count acc n)
+  ptr)
 
 #+:sbcl
 (defun ptr-read-float (ptr)
@@ -325,10 +321,18 @@
       ((eq needle h) haystack)
       (t (pointer-of needle (+ 1 haystack))))))
 
+#-:repl
 (defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
   (if (and (> bytes 0)
            (> alignment 0))
       (* (ceiling (/ bytes alignment)) alignment)
+      0))
+
+#+:repl
+(defun align-bytes (bytes &optional (alignment *SIZEOF_LONG*))
+  (if (and (> bytes 0)
+           (> alignment 0))
+      (* (+ 1 (/ bytes alignment)) alignment)
       0))
 
 #+:sbcl

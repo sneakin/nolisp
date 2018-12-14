@@ -10,7 +10,8 @@
   (assert-equal (eq 2 2) 1)
   (assert-equal (eq -10 -10) 1)
   (assert-equal (eq 'hello 'world) 0)
-  (assert-equal (eq 'hello 'hello) 1))
+  (assert-equal (eq 'hello 'hello) 1)
+  (assert-equal (eq 'hello :hello) 0))
 
 (defun test-suite-eq ()
   (test-eq)
