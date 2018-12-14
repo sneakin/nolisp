@@ -4,12 +4,13 @@
 (require "memory")
 (require "type-sizes")
 (require "symbol")
+(require "logging")
 
 (in-package :repl)
 
 (defun env-push-binding (name env)
   "Adds NAME to ENV and returns the new ENV stack address."
-  (format *standard-output*
+  (logger :debug
           ";; Binding ~A ~A to ~A~%"
           (if (> name 0)
               (ptr-read-string name)
@@ -23,7 +24,7 @@
   "Removes NUM bindings from ENV returning the new ENV stack address."
   (if (> num 0)
       (progn
-        (format *standard-output* ";; Unbinding ~A slots~%" num)
+        (logger :debug ";; Unbinding ~A slots~%" num)
         (ptr-write-long 0 env)
         (env-pop-bindings (- env *REGISTER-SIZE*) (- num 1)))
       env))
@@ -31,7 +32,7 @@
 (defun env-push-alloc (bytes env)
   "Adds BYTES worth of space to the ENV stack returning the new address."
   (let ((bytes (align-bytes bytes *REGISTER-SIZE*)))
-    (format *standard-output* ";; Binding ~A bytes~%" bytes)
+    (logger :debug ";; Binding ~A bytes~%" bytes)
     (ptr-zero env bytes)
     (+ env bytes)))
 
@@ -41,11 +42,13 @@
 
 (defun env-pop-alloc (bytes env)
   "Removes a binding of allocated bytes."
-  (format *standard-output* ";; Unbinding ~A bytes~%" (align-bytes bytes))
+  (logger :debug ";; Unbinding ~A bytes~%" (align-bytes bytes))
   (- (env-pop-bindings env 1) (align-bytes (+ bytes *REGISTER-SIZE*))))
 
 (defun env-symbol-position (sym env-start env &optional (n 0))
   "Returns the binding slot index of SYM in the environment defined by ENV-START and ENV."
+  #-:sbcl
+  (logger :debug ";; env-symbol-position ~A ~s ~x ~x ~x ~d~%" sym (symbol-string sym) (ptr-read-ulong sym) env-start env n)
   (if (>= env env-start)
       (if (eq (ptr-read-ulong (- env *REGISTER-SIZE*)) sym)
           n
@@ -63,7 +66,7 @@
 (defun env-function-position (func-name env-start env)
   "Returns the index of FUNC-NAME in the code segment."
   (let* ((idx (env-data-position func-name env-start env)))
-    (format *standard-output* ";; resolving ~A to ~A~%" (symbol-string func-name) idx)
+    (logger :debug ";; resolving ~A to ~A~%" (symbol-string func-name) idx)
     (if idx
         idx
         (env-data-position func-name env-start env))))

@@ -3,6 +3,8 @@
 
 (load "sbcl.lisp")
 
+(require "logging")
+
 #+:WIN32 (defconstant EXECUTABLE-EXT ".exe")
 #-:WIN32 (defconstant EXECUTABLE-EXT "")
 
@@ -16,6 +18,8 @@
            (string= arg "--output"))  (values :output (second args) (rest (rest args))))
       ((or (string= arg "-L")
            (string= arg "--search"))  (values :search-path (second args) (rest (rest args))))
+      ((string= arg "--log-level") (values :log-level (second args) (rest (rest args))))
+      ((string= arg "--no-tail") (values :no-tail t (rest args)))
       (t (values nil nil (rest args) (first args))))))
 
 (defun parse-command-line-args (args &optional options unused)
@@ -41,10 +45,12 @@
 
 (defun repl-compiler-help ()
   (format *standard-output* "Options:~%")
-  (format *standard-output* "  -help     Print this helpful message~%")
-  (format *standard-output* "  -o path   Path of the output file~%")
-  (format *standard-output* "  -L path   Path to search for required files~%")
-  (format *standard-output* "  -ds address   Address to locate the data segment~%")
+  (format *standard-output* "              -help  Print this helpful message~%")
+  (format *standard-output* "            -o path  Path of the output file~%")
+  (format *standard-output* "            -L path  Path to search for required files~%")
+  (format *standard-output* "                -ds  address  Address to locate the data segment~%")
+  (format *standard-output* "  --log-level level  Maximum level of log messages to print.~%")
+  (format *standard-output* "          --no-tail  Do not optimize tail calls.~%")
   (format *standard-output* "~%"))
 
 (defun repl-compiler-toplevel ()
@@ -55,7 +61,12 @@
           (output-file (cdr (assoc :output options)))
           (search-path (cdr (assoc :search-path options)))
           (data-segment-offset (or (cdr (assoc :data-segment options)) (* 2 1024 1024)))
-          (image-root (make-pathname :directory (pathname-directory (pathname (first sb-ext:*posix-argv*))))))
+          (image-root (make-pathname :directory (pathname-directory (pathname (first sb-ext:*posix-argv*)))))
+          (log-level (or (cdr (assoc :log-level options)) :info))
+          (no-tail (cdr (assoc :no-tail options))))
+      ;; set logger level and reset logger stream
+      (repl::logger-init log-level)
+      (setq repl::*allow-tail-calls* (not no-tail))
       ;; add the binary's path to the load-path
       (push image-root repl::*load-path*)
       (push (merge-pathnames (make-pathname :name "runtime") image-root) repl::*load-path*)

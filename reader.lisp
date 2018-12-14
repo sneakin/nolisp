@@ -176,7 +176,7 @@
        (read-string (+ str 1) (+ output 1) terminator (or output-start output))))))
 
 (defun character-by-name (char-sym)
-  (format *standard-output* "Char by name ~A~%" char-sym)
+  (logger :debug "Char by name ~A~%" char-sym)
   (cond
     ((string-equal char-sym "space") #\space)
     ((string-equal char-sym "newline") #\newline)
@@ -192,7 +192,7 @@
 
 (defun read-character-symbol (str token-offset &optional (starting nil))
   (let ((c (ptr-read-byte str)))
-    (format *standard-output* "read-char-symbol ~A ~A ~A ~A ~A~%" str c (code-char c) (space? c) (null c))
+    (logger :debug "read-char-symbol ~A ~A ~A ~A ~A~%" str c (code-char c) (space? c) (null c))
     (cond
       ((or (space? c) (null c) (not (symbol-char? c)))
        (ptr-write-byte 0 token-offset)
@@ -233,7 +233,7 @@
 (defun read-token (str token-offset)
   (let ((c (ptr-read-ubyte str)))
     #-:sbcl
-    (format *standard-output* ";; read-token ~A ~x ~s~%" c (ptr-read-ulong str) str)
+    (logger :debug ";; read-token ~A ~x ~s~%" c (ptr-read-ulong str) str)
     (cond
       ((space? c) (read-token (+ 1 str) token-offset))
       ((digit? c) (read-signed-number str 0 *NUMBER-BASE* token-offset))
@@ -251,7 +251,7 @@
 (defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
   (multiple-value-bind (kind value offset new-token-offset)
       (read-token offset token-offset)
-    ;; (format *standard-output* "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
+    ;; (logger :debug "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
     (cond
       ((eq kind 'symbol)
        (scan-list offset new-token-offset initiator terminator depth))

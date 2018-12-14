@@ -1,5 +1,9 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "globals")
+(require "memory")
+
+#-:repl
 (in-package :repl)
 
 #+:repl
@@ -60,6 +64,7 @@
           (setq str (symbol-name str))))
   (let* ((off (ptr-write-string str segment-end))
          (id (symbol-id segment-end segment-start)))
+    #-:repl (logger :debug ";; Interning ~A to ~A~%" (ptr-read-string str) id)
     (if id
         (values id segment-end)
         (values segment-end off))))

@@ -16,6 +16,7 @@
     (multiple-value-bind (sym new-ending)
         (symbol-intern (concatenate 'string *symbol-gen-prefix* (itoa *symbol-next-token* str))
                        segment offset)
+      (logger :debug ";; symbol-gen ~A~%" (ptr-read-string sym))
       (setq *symbol-next-token* (+ *symbol-next-token* 1))
       (values sym new-ending)))
   )

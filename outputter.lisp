@@ -1,8 +1,9 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 (require "memory")
 (require "symbol")
-(require "emitter")
+(require "cpu/bacaw/emitter")
 (require "compiler/package")
+(require "logging")
 
 (in-package :repl)
 
@@ -36,7 +37,7 @@
            ;; todo need to get the correct offset after init is emitted
            (string-segment (+ *INIT-SIZE* *ISR-TOTAL-SIZE* (- code-segment cs-start)))
            (data-segment (align-bytes (or data-segment-offset (+ string-segment (- token-offset token-start))) 4096)))
-      (format *standard-output* "write-to-array ~A ~A ~A ~A ~A~%" (ptr-read-array asm-start (- asm-stack asm-start)) (- token-offset token-start) (- code-segment cs-start) string-segment data-segment)
+      (logger :debug "write-to-array ~A ~A ~A ~A ~A~%" (ptr-read-array asm-start (- asm-stack asm-start)) (- token-offset token-start) (- code-segment cs-start) string-segment data-segment)
       (multiple-value-bind (asm-stack-end string-segment-jump-offset)
           (emit-init asm-stack
                      *ISR-TOTAL-SIZE*
@@ -61,17 +62,17 @@
                               (* 4 *SIZEOF_LONG*))))
           ;; fix string-segment offset
           (ptr-write-long code-segment-size (+ code-segment (- string-segment-jump-offset asm-start)))
-          (format *standard-output*
+          (logger :debug
                   ";; setting string-segment at ~A -> ~A~%"
                   (- string-segment-jump-offset asm-start)
                   (+ code-segment (- string-segment-jump-offset asm-start)))
-          (format *standard-output*
+          (logger :debug
                   ";; code-segment at ~A:~A ~A: ~A~%"
                   cs-start code-segment code-segment-size (ptr-read-array cs-start 64))
-          (format *standard-output*
+          (logger :debug
                   ";; token-segment at ~A:~A~%"
                   token-start (- token-offset token-start))
-          (format *standard-output* "Total size ~A bytes~%" total-size)
+          (logger :info "Total size ~d bytes~%" total-size)
           ;; zero ISR
           (ptr-zero output *ISR-TOTAL-SIZE*)
           ;; place jump at byte 0

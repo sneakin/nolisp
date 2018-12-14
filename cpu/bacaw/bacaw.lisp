@@ -1,6 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-(require "isa")
+(require "cpu/bacaw/isa")
 
 (in-package :repl)
 

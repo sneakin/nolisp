@@ -166,6 +166,7 @@
 (defun package-intern (state str)
   (multiple-value-bind (sym offset)
       (symbol-intern str (package-string-segment-data state) (package-string-segment-offset state))
+    (logger :debug ";; package-intern ~A ~A ~A ~A~%" str sym offset (package-code-segment-buffer state))
     (set-package-string-segment-offset state offset)
     sym))
 

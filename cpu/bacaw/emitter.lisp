@@ -4,6 +4,7 @@
 (require "symbol")
 (require "string")
 (require "type-sizes")
+(require "logging")
 
 (in-package :repl)
 
@@ -53,6 +54,7 @@
     ((eq op :LOGU) (make-short #x3 #xd a b))
     ((eq op :CMPU) (make-short #x3 0 a b))
     ((eq op :CEILF) (make-short #x4 #x6 a b))
+    ((eq op :CONVF) (make-short #x4 #xb a b))
     ((eq op :LOAD) (make-short #x5 a b c))
     ((eq op :POP) (make-short #x6 a b c))
     ((eq op :CIE) (make-short #x7 #x0 a b))
@@ -70,24 +72,24 @@
 
 (defun emit-op (stack op &optional a b c)
   (let ((op (intern-keyword op)))
-    (format *standard-output* "~A ~A ~A ~A    ~A~%" op (or a 0) (or b 0) (or c 0) (make-op op a b c))
+    (logger :debug "~A ~A ~A ~A    ~A~%" op (or a 0) (or b 0) (or c 0) (make-op op a b c))
     (ptr-write-short (make-op op a b c) stack)
     (+ stack *SIZEOF_SHORT*)))
 
 (defun emit-float (stack value)
-  (format *standard-output* "float32(~A)~%" value)
+  (logger :debug "float32(~A)~%" value)
   (ptr-write-float value stack)
   (+ stack *SIZEOF_FLOAT*)
   )
 
 (defun emit-integer (stack value)
-  (format *standard-output* "ulong(~A)~%" value)
+  (logger :debug "ulong(~A)~%" value)
   (ptr-write-long value stack)
   (+ stack *SIZEOF_LONG*)
   )
 
 (defun emit-value (asm-stack kind value &optional (reg 0) (condition 0))
-  (format *standard-output* ";; Value ~A ~A -> ~A~%" kind value reg)
+  (logger :debug ";; Value ~A ~A -> ~A~%" kind value reg)
   (if (eq kind 'float)
       (emit-float (emit-op asm-stack :load reg condition 15) value)
       (emit-integer (emit-op asm-stack :load reg condition 15) value)))
@@ -105,13 +107,14 @@
   )
 
 (defun emit-store-data-value (asm-stack offset &optional (register 0))
+  (logger :debug ";; store R~A at R9+~A~%" register offset)
   (emit-integer (emit-op asm-stack :store register 0 9) (* *REGISTER-SIZE* offset))
   )
 
 (defun emit-lookup-call (asm-stack symbol symbol-index)
   ;; load the symbol value into R1 and the toplevel lookup from the top of the stack
   ;; todo need to lookup the lookup function since lambda's set env to env-start
-  (format *standard-output* ";;  globally~%")
+  (logger :debug ";;  globally~%")
   (emit-integer (emit-op (emit-integer (emit-op (emit-integer (emit-op asm-stack 'load 1 0 15)
                                                               symbol)
                                                 :load 0 0 11)
@@ -122,7 +125,7 @@
 (defun emit-lookup-global (asm-stack symbol symbol-index)
   ;; search env for symbol
   ;; if found, get its position and emit code to load its value
-  (format *standard-output* ";; Lookup global ~A ~A ~A~%" symbol (symbol-string symbol) symbol-index)
+  (logger :debug ";; Lookup global ~A ~S ~A~%" symbol (symbol-string symbol) symbol-index)
   (let ((stack-pos (symbol-index-offset symbol-index symbol)))
     (if stack-pos
         (emit-load-data-value asm-stack stack-pos))))
@@ -130,7 +133,7 @@
 (defun emit-lookup-local (asm-stack symbol env-start env)
   ;; search env for symbol
   ;; if found, get its position and emit code to load its value
-  (format *standard-output* ";; Lookup local ~A ~A ~A ~A ~A~%" symbol (symbol-string symbol) env-start env (symbol-id symbol))
+  (logger :debug ";; Lookup local ~A ~S ~A ~A ~A~%" symbol (symbol-string symbol) env-start env (symbol-id symbol))
   (let ((stack-pos (env-stack-position symbol env-start env)))
     (if stack-pos
         (emit-load-stack-value asm-stack stack-pos))))
@@ -193,7 +196,7 @@
       asm-stack))
 
 (defun emit-poppers (asm-stack num-bindings)
-  (format *standard-output* ";; ~A poppers~%" num-bindings)
+  (logger :debug ";; ~A poppers~%" num-bindings)
   (if (> num-bindings 0)
       (emit-integer (emit-op asm-stack :inc 11)
                     (* num-bindings *REGISTER-SIZE*))
@@ -203,25 +206,25 @@
   (emit-op asm-stack :mov dest src))
 
 (defun emit-stack-alloc (asm-stack size)
-  (format *standard-output* ";; stack-alloc ~A bytes~%" size)
+  (logger :debug ";; stack-alloc ~A bytes~%" size)
   ;; shift SP
   (emit-integer (emit-op asm-stack :dec 11)
                 (align-bytes size)))
 
 (defun emit-stack-alloc-value (asm-stack size)
-  (format *standard-output* ";; stack-alloc-value ~A bytes~%" size)
+  (logger :debug ";; stack-alloc-value ~A bytes~%" size)
   ;; shift SP, mov SP to return value
   (emit-mov (emit-stack-alloc asm-stack size)
             0 11))
 
 (defun emit-stack-alloc-binding (asm-stack size)
-  (format *standard-output* ";; stack-alloc-binding ~A bytes~%" size)
+  (logger :debug ";; stack-alloc-binding ~A bytes~%" size)
   ;; shift SP, push SP
   (emit-push (emit-stack-alloc asm-stack size)
              11))
 
 (defun emit-stack-free (asm-stack size)
-  (format *standard-output* ";; Freeing ~A bytes~%" (+ (align-bytes size) (* 1 *REGISTER-SIZE*)))
+  (logger :debug ";; Freeing ~A bytes~%" (+ (align-bytes size) (* 1 *REGISTER-SIZE*)))
   (emit-integer (emit-op asm-stack :inc 11) (+ (align-bytes size) (* 1 *REGISTER-SIZE*))))
 
 (defun emit-jump (asm-stack offset &optional (condition 0))
@@ -231,7 +234,7 @@
   (emit-jump asm-stack offset condition))
 
 (defun emit-fixed-jump (asm-stack new-jump-offset)
-  (format *standard-output* ";; fixing body jump ~A ~A~%" (+ new-jump-offset *SIZEOF_LONG*) (- asm-stack *SIZEOF_LONG*))
+  (logger :debug ";; fixing body jump ~A ~A~%" (+ new-jump-offset *SIZEOF_LONG*) (- asm-stack *SIZEOF_LONG*))
   (ptr-write-long (+ new-jump-offset *SIZEOF_LONG*) (- asm-stack *SIZEOF_LONG*)))
 
 (defun emit-zero-cmp (asm-stack reg temp-reg)
@@ -285,7 +288,7 @@
   (emit-op asm-stack :callr 10 reg))
 
 (defun emit-reg-jump (asm-stack reg)
-  (format *standard-output* ";; reg-jump R~A~%" reg)
+  (logger :debug ";; reg-jump R~A~%" reg)
   (emit-op (emit-op (emit-op (if (> reg 0)
                                  (emit-op asm-stack :mov reg 0)
                                  asm-stack)
@@ -347,8 +350,8 @@
   ;; Copies the call's arguments and the return address at the return-offset up the stack.
   ;; The address at the return-offset is in bytes. Callers-bindings are in number of bindings.
   ;; todo return-offset is in bytes: everything else is number of bindings
-  (format *standard-output* ";; tailcall R~A+~A, ~A args, return at ~A, ~A bindings~%" reg data-offset num-args return-offset (/ callers-bindings *REGISTER-SIZE*))
   (let ((stack-size (/ callers-bindings *REGISTER-SIZE*)))
+    (logger :debug ";; tailcall R~A+~A, ~A args, return at ~A, ~A bindings~%" reg data-offset num-args return-offset stack-size)
     ;; pop values, pop caller's values moving stack frame over caller's, call
     (emit-call-jump (emit-move-stack asm-stack (/ return-offset *REGISTER-SIZE*) num-args (+ num-args stack-size) num-args)
                     reg data-offset)))

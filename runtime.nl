@@ -2,6 +2,7 @@
 
 (defvar *COMPILER* 0)
 
+(require "globals")
 (require "runtime/truth")
 (require "runtime/halt")
 (require "runtime/eq")
@@ -15,6 +16,7 @@
 (require "runtime/error")
 (require "runtime/memory")
 (require "runtime/array")
+(require "runtime/symbol")
 (require "runtime/string")
 (require "runtime/concatenate")
 (require "runtime/package")
