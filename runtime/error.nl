@@ -1,10 +1,21 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
 (defun console-write (str &optional (n 0)))
+(defun console-write-unsigned-integer (n &optional (base 10)))
 
 (defun error (kind &optional a b c d e f g)
   (console-write "ERROR:")
   (console-write kind)
+  (console-write b 16)
+  (console-write d 16)
+  (console-write f 16)
+  (console-write-unsigned-integer a 16)
+  (console-write-unsigned-integer b 16)
+  (console-write-unsigned-integer c 16)
+  (console-write-unsigned-integer d 16)
+  (console-write-unsigned-integer e 16)
+  (console-write-unsigned-integer f 16)
+  (console-write-unsigned-integer g 16)
   (asm (push 0)
        (push 11) ;; sp
        (push 12) ;; ip
