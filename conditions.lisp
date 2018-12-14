@@ -122,7 +122,7 @@
 #+:sbcl
 (defmethod print-object ((condition undefined-function-error) stream)
   (unless (slot-value condition 'msg)
-    (setf (slot-value condition 'msg) (format nil "~A ~A with ~A argugments"
+    (setf (slot-value condition 'msg) (format nil "~A ~A with ~A arguments"
                                               (slot-value condition 'name)
                                               (symbol-string (slot-value condition 'name))
                                               (slot-value condition 'args))))
