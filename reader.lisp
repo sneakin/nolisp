@@ -5,11 +5,15 @@
 (require "memory")
 (require "symbol")
 (require "sequence")
+(require "logging")
 
+#+:repl (require "runtime/math/float")
+#-:repl (require "runtime/cl/math/float")
+
+#-:repl
 (in-package :repl)
 
 ;;; Base of the read numbers
-(defvar *NUMBER-BASE* 10)
 (defvar *SYMBOL-SPECIALS* ".,:-~!@$%^&*_=+\\/?<>|#")
 (defvar *LIST-INITIATORS* "([{")
 (defvar *LIST-TERMINATORS* ")]}")
@@ -17,8 +21,7 @@
 #+:sbcl
 (defvar *SPACES* (format nil "~c~c~c~c" #\space #\newline #\tab #\return))
 #+:repl
-(defvar *SPACES* " 	
-")
+(defvar *SPACES* " \t\n\r")
 
 (defun symbol-special? (c)
   (not (eq -1 (index-of c *SYMBOL-SPECIALS*))))
@@ -100,22 +103,19 @@
     ((upper-alpha? c) (+ 10 (- c (char-code #\A))))
     (t 0)))
 
-(defun read-decimal (str acc base token-offset position)
-  (let ((c (ptr-read-byte str)))
+(defun read-signed-number (str acc base token-offset &optional (allow-decimal t))
+  (let* ((c (ptr-read-byte str))
+         (n (digit-value c)))
     (cond
-      ((digit? c)
-       (read-decimal (+ 1 str) (+ acc (/ (digit-value c) (expt base position))) base token-offset (+ 1 position)))
-      (t (values 'float (float acc) str token-offset))))
-  )
-
-(defun read-signed-number (str acc base token-offset)
-  (let ((c (ptr-read-byte str)))
-    (cond
-      ((or (digit? c) (and (alpha? c) (> base 10)))
-       (read-signed-number (+ 1 str) (+ (* base acc) (digit-value c)) base token-offset))
-      ((and (alpha? c) (<= base 10))
+      ((and (or (digit? c) (and (alpha? c) (> base 10)))
+            (< n base))
+       (read-signed-number (+ 1 str) (+ (* base acc) n) base token-offset allow-decimal))
+      ((>= n base)
        (error 'invalid-character-error :offset str :value c))
-      ((eq c (char-code #\.)) (read-decimal (+ 1 str) acc base token-offset 1))
+      ((and allow-decimal (eq c (char-code #\.)))
+       (multiple-value-bind (kind dec-value next-str next-token-offset)
+           (read-signed-number (+ 1 str) 0 base token-offset nil)
+         (values 'float (make-float-2i acc dec-value) next-str next-token-offset)))
       (t (values 'integer acc str token-offset)))))
 
 (defun read-negative-number (str acc base token-offset)
@@ -129,7 +129,7 @@
 (defun read-plus (str token-offset)
   (let ((c (ptr-read-byte (+ 1 str))))
     (cond
-      ((digit? c) (read-signed-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
+      ((digit? c) (read-signed-number (+ 1 str) 0 *INPUT-BASE* token-offset))
       (t (read-symbol str token-offset)))))
 
 (defun read-number (str acc base token-offset)
@@ -169,30 +169,63 @@
        (ptr-write-byte 0 output)
        (values 'string (or output-start output) (+ 1 str) (+ 1 output)))
       ((eq c (char-code #\\))
-       (ptr-write-byte (char-code (unescape-char (ptr-read-byte (+ 1 str)))) output)
-       (read-string (+ str 2) (+ output 1) terminator (or output-start output)))
+       (let ((cc (ptr-read-byte (+ 1 str))))
+         (cond
+           ;; read \xNN escapes
+           ((eq cc (char-code #\x))
+            (multiple-value-bind (kind value xoff xtok)
+                (read-signed-number (+ 2 str) 0 16 nil nil)
+              (ptr-write-byte value output)
+              (read-string xoff (+ output 1) terminator (or output-start output))))
+           ;; basic single character escapes: \C
+           (t (ptr-write-byte (char-code (unescape-char cc)) output)
+              (read-string (+ str 2) (+ output 1) terminator (or output-start output))))))
       (t
        (ptr-write-byte c output)
        (read-string (+ str 1) (+ output 1) terminator (or output-start output))))))
 
 (defun character-by-name (char-sym)
-  (logger :debug "Char by name ~A~%" char-sym)
   (cond
+    ((string-equal char-sym "Nul") #\Nul)
+    ((string-equal char-sym "Soh") #\Soh)
+    ((string-equal char-sym "Stx") #\Stx)
+    ((string-equal char-sym "Etx") #\Etx)
+    ((string-equal char-sym "Eot") #\Eot)
+    ((string-equal char-sym "Enq") #\Enq)
+    ((string-equal char-sym "Ack") #\Ack)
+    ((string-equal char-sym "Bel") #\Bel)
+    ((string-equal char-sym "Backspace") #\Backspace)
+    ((string-equal char-sym "Tab") #\Tab)
+    ((string-equal char-sym "Newline") #\Newline)
+    ((string-equal char-sym "Vt") #\Vt)
+    ((string-equal char-sym "Page") #\Page)
+    ((string-equal char-sym "Return") #\Return)
+    ((string-equal char-sym "So") #\So)
+    ((string-equal char-sym "Si") #\Si)
+    ((string-equal char-sym "Dle") #\Dle)
+    ((string-equal char-sym "Dc1") #\Dc1)
+    ((string-equal char-sym "Dc2") #\Dc2)
+    ((string-equal char-sym "Dc3") #\Dc3)
+    ((string-equal char-sym "Dc4") #\Dc4)
+    ((string-equal char-sym "Nak") #\Nak)
+    ((string-equal char-sym "Syn") #\Syn)
+    ((string-equal char-sym "Etb") #\Etb)
+    ((string-equal char-sym "Can") #\Can)
+    ((string-equal char-sym "Em") #\Em)
+    ((string-equal char-sym "Sub") #\Sub)
+    ((string-equal char-sym "Esc") #\Esc)
+    ((string-equal char-sym "Fs") #\Fs)
+    ((string-equal char-sym "Gs") #\Gs)
+    ((string-equal char-sym "Rs") #\Rs)
+    ((string-equal char-sym "Us") #\Us)
+    ((string-equal char-sym " ") #\space)
     ((string-equal char-sym "space") #\space)
-    ((string-equal char-sym "newline") #\newline)
-    ((string-equal char-sym "linefeed") #\linefeed)
-    ((string-equal char-sym "return") #\return)
-    ((string-equal char-sym "tab") #\tab)
-    ((string-equal char-sym "backspace") #\backspace)
-    ((string-equal char-sym "page") #\page)
-    ((string-equal char-sym "rubout") #\rubout)
     ((eq (length char-sym) 1) (string-aref char-sym 0))
     (t (error 'invalid-character-error :value char-sym))
     ))
 
 (defun read-character-symbol (str token-offset &optional (starting nil))
   (let ((c (ptr-read-byte str)))
-    (logger :debug "read-char-symbol ~A ~A ~A ~A ~A~%" str c (code-char c) (space? c) (null c))
     (cond
       ((or (space? c) (null c) (not (symbol-char? c)))
        (ptr-write-byte 0 token-offset)
@@ -234,13 +267,11 @@
 
 (defun read-token (str token-offset)
   (let ((c (ptr-read-ubyte str)))
-    #-:sbcl
-    (logger :debug ";; read-token ~A ~x ~s~%" c (ptr-read-ulong str) str)
     (cond
       ((space? c) (read-token (+ 1 str) token-offset))
-      ((digit? c) (read-signed-number str 0 *NUMBER-BASE* token-offset))
+      ((digit? c) (read-signed-number str 0 *INPUT-BASE* token-offset))
       ((eq c (char-code #\+)) (read-plus str token-offset))
-      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *NUMBER-BASE* token-offset))
+      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *INPUT-BASE* token-offset))
       ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset))
       ((or (alpha? c)
            (symbol-special? c)) (read-symbol str token-offset))
@@ -253,7 +284,6 @@
 (defun scan-list (offset token-offset &optional (initiator (char-code #\()) (terminator (char-code #\))) (depth 0))
   (multiple-value-bind (kind value offset new-token-offset)
       (read-token offset token-offset)
-    ;; (logger :debug "scan ~A: ~A ~A~%" depth kind (if (eq kind 'symbol) (symbol-string value) value))
     (cond
       ((eq kind 'symbol)
        (scan-list offset new-token-offset initiator terminator depth))

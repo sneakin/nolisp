@@ -7,3 +7,7 @@
 (defun ceiling (n)
   (asm (load 0 0 11) 4
        (ceilf 0 0)))
+
+(defun floorf (n)
+  (asm (load 0 0 11) 4
+       (floorf 0 0)))

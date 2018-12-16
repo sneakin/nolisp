@@ -1,5 +1,7 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+#+:repl (require "runtime/eq")
+
 (defvar *REGISTER-SIZE* 4)
 (defvar *REGISTER-COUNT* 16)
 

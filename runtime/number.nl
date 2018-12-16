@@ -1,11 +1,10 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "globals")
 (require "runtime/eq")
 (require "runtime/cmp")
 (require "runtime/char")
 (require "runtime/bitops")
-
-(var *output-base* 10)
 
 (defun numberp (obj)
   t)

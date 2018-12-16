@@ -14,3 +14,5 @@
   (defvar *STRING-SEGMENT* 0)
   (defvar *COMPILER* 0))
 
+(defvar *INPUT-BASE* 10)
+(defvar *output-base* 10)

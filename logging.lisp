@@ -42,6 +42,8 @@
 
 #+:repl
 (require "runtime/bc/io/console")
+#+:repl
+(require "runtime/io")
 
 #+:soon
 (defun logger (level msg &optional a b c d e f g)
@@ -51,3 +53,4 @@
 #+:repl
 (defun logger (level msg &optional a b c d e f g)
   (format-lambda console-write-byte/1 msg a b c d e f g))
+

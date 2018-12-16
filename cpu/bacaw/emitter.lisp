@@ -31,6 +31,7 @@
     ((eq op :BSR) (make-short 0 13 a b))
     ((eq op :CLS) (make-short 0 #xE a b))
     ((eq op :INTR) (make-short 0 #xF a b))
+    ;; signed
     ((eq op :INC) (make-short #x1 a b c))
     ((eq op :ADDI) (make-short #x2 #x1 a b))
     ((eq op :MODI) (make-short #x2 #x8 a b))
@@ -43,6 +44,7 @@
     ((eq op :LOGI) (make-short #x2 #xd a b))
     ((eq op :CMP) (make-short #x2 0 a b))
     ((eq op :CMPI) (make-short #x2 0 a b))
+    ;; unsigned
     ((eq op :ADDU) (make-short #x3 #x1 a b))
     ((eq op :MODU) (make-short #x3 #x8 a b))
     ((eq op :SUBU) (make-short #x3 #x9 a b))
@@ -53,8 +55,20 @@
     ((eq op :ROOTU) (make-short #x3 #xc a b))
     ((eq op :LOGU) (make-short #x3 #xd a b))
     ((eq op :CMPU) (make-short #x3 0 a b))
+    ;; float
+    ((eq op :ADDF) (make-short #x4 #x1 a b))
+    ((eq op :MODF) (make-short #x4 #x8 a b))
+    ((eq op :SUBF) (make-short #x4 #x9 a b))
+    ((eq op :MULF) (make-short #x4 #x2 a b))
+    ((eq op :POWF) (make-short #x4 #x4 a b))
     ((eq op :CEILF) (make-short #x4 #x6 a b))
+    ((eq op :DIVF) (make-short #x4 #xa a b))
     ((eq op :CONVF) (make-short #x4 #xb a b))
+    ((eq op :ROOTF) (make-short #x4 #xc a b))
+    ((eq op :LOGF) (make-short #x4 #xd a b))
+    ((eq op :FLOORF) (make-short #x4 #xe a b))
+    ((eq op :CMPF) (make-short #x4 0 a b))
+
     ((eq op :LOAD) (make-short #x5 a b c))
     ((eq op :POP) (make-short #x6 a b c))
     ((eq op :CIE) (make-short #x7 #x0 a b))
