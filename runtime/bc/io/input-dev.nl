@@ -47,6 +47,7 @@
       t
       (progn
         (interrupts-enable)
+        (input-dev-read-more)
         (sleep)
         (if disabled (interrupts-disable))
         (input-dev-wait-loop disabled))))
@@ -67,11 +68,19 @@
           (set input-dev-next-byte (+ input-dev-next-byte 1))          
           b))))
 
-(defun input-dev-readline (dest)
-  (input-dev-wait)
+(defun input-dev-readline (dest &optional count)
   (if (and (input-dev-eos)
-          (not (input-dev-ready)))
+           (not (input-dev-ready)))
       nil
-      (progn
-        (ptr-write-ubyte 0 (ptr-copy input-dev-buffer-addr dest (input-dev-bytes-read)))
-        dest)))
+      (let* ((bytes (input-dev-bytes-read))
+             (len (if count
+                      (min (- count 1) bytes)
+                      bytes)))
+        (if bytes
+            (progn
+              (ptr-write-ubyte 0 (ptr-copy input-dev-buffer-addr dest len))
+              (input-dev-read-more)
+              len)
+            (progn
+              (input-dev-wait)
+              (input-dev-readline dest count))))))

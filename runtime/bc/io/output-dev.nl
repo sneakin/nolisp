@@ -1,5 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
+(require "globals")
 (require "runtime/memory")
 (require "runtime/string")
 (require "runtime/itoa")
