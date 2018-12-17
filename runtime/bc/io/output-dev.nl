@@ -3,7 +3,7 @@
 (require "globals")
 (require "runtime/memory")
 (require "runtime/string")
-(require "runtime/itoa")
+(require "runtime/convertors/string")
 (require "runtime/halt")
 (require "runtime/interrupts")
 (require "runtime/bc/address-map")

@@ -4,17 +4,7 @@
 
 #+:repl (require "runtime/number")
 #+:repl (require "runtime/string")
-#+:repl (require "runtime/itoa")
-
-#+:sbcl
-(defun itoa (n output-seq &optional (base 10))
-  (let ((old-base *print-base*))
-    (unwind-protect
-         (progn (setq *print-base* base)
-                (let ((str (format nil "~A" n)))
-                  (ptr-write-string str output-seq)
-                  str))
-      (setq *print-base* old-base))))
+#+:repl (require "runtime/convertors")
 
 #+:sbcl
 (defun string-aref (str n)

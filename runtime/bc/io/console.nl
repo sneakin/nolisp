@@ -2,7 +2,7 @@
 
 (require "runtime/memory")
 (require "runtime/string")
-(require "runtime/itoa")
+(require "runtime/convertors/string")
 (require "runtime/bc/address-map")
 
 (var console-memory-size 1024)

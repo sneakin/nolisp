@@ -31,6 +31,8 @@
        (load 0 2 15) 1
        (load 0 1 15) 1))
 
+;;; Unsigned
+
 (def <-unsigned (a b)
   (asm (load 0 0 11) 8
        (load 1 0 11) 4
@@ -57,6 +59,37 @@
   (asm (load 0 0 11) 8
        (load 1 0 11) 4
        (cmp 1 0)
+       (load 0 0 15) 0
+       (load 0 4 15) 1
+       (load 0 1 15) 1))
+
+;;; Floating point
+(def <-float (a b)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cmpf 0 1)
+       (load 0 0 15) 0
+       (load 0 4 15) 1))
+
+(def <=-float (a b)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cmpf 0 1)
+       (load 0 0 15) 0
+       (load 0 4 15) 1
+       (load 0 1 15) 1))
+
+(def >-float (a b)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cmpf 1 0)
+       (load 0 0 15) 0
+       (load 0 4 15) 1))
+
+(def >=-float (a b)
+  (asm (load 0 0 11) 8
+       (load 1 0 11) 4
+       (cmpf 1 0)
        (load 0 0 15) 0
        (load 0 4 15) 1
        (load 0 1 15) 1))

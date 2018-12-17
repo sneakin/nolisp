@@ -8,7 +8,7 @@
 (require "logging")
 
 #+:repl (require "runtime/math/float")
-#-:repl (require "runtime/cl/math/float")
+(require "runtime/convertors")
 
 #-:repl
 (in-package :repl)
@@ -88,10 +88,10 @@
       (t (ptr-write-byte 0 output)
          (values 'symbol starting str (+ 1 output))))))
 
-(defun read-symbol (str output)
+(defun read-symbol (str output sym-tab)
   (multiple-value-bind (kind value offset token-offset)
       (read-symbol-inner str output)
-    (let ((sym-id (symbol-id value)))
+    (let ((sym-id (if sym-tab (symbol-id value sym-tab))))
       (if sym-id
           (values kind sym-id offset output)
           (values kind value offset token-offset)))))
@@ -110,33 +110,38 @@
       ((and (or (digit? c) (and (alpha? c) (> base 10)))
             (< n base))
        (read-signed-number (+ 1 str) (+ (* base acc) n) base token-offset allow-decimal))
-      ((>= n base)
+      ((and (alpha? c) (>= n base))
        (error 'invalid-character-error :offset str :value c))
       ((and allow-decimal (eq c (char-code #\.)))
        (multiple-value-bind (kind dec-value next-str next-token-offset)
            (read-signed-number (+ 1 str) 0 base token-offset nil)
-         (values 'float (make-float-2i acc dec-value) next-str next-token-offset)))
+         (values 'float
+                 (make-float-decimal acc dec-value nil base (- next-str (+ 1 str)))
+                 next-str next-token-offset)))
       (t (values 'integer acc str token-offset)))))
 
-(defun read-negative-number (str acc base token-offset)
+(defun read-negative-number (str acc base token-offset sym-tab)
   (let ((c (ptr-read-byte str)))
     (if (or (digit? c) (and (alpha? c) (> base 10)))
         (multiple-value-bind (kind value offset token-offset)
             (read-signed-number str acc base token-offset)
-          (values kind (- value) offset token-offset))
-        (read-symbol (- str 1) token-offset))))
+          (cond
+            ((eq kind 'float) (values kind (--float value) offset token-offset))
+            ((eq kind 'integer) (values kind (- value) offset token-offset))
+            (t (error 'invalid-character-error :offset str))))
+        (read-symbol (- str 1) token-offset sym-tab))))
 
-(defun read-plus (str token-offset)
+(defun read-plus (str token-offset sym-tab)
   (let ((c (ptr-read-byte (+ 1 str))))
     (cond
       ((digit? c) (read-signed-number (+ 1 str) 0 *INPUT-BASE* token-offset))
-      (t (read-symbol str token-offset)))))
+      (t (read-symbol str token-offset sym-tab)))))
 
-(defun read-number (str acc base token-offset)
+(defun read-number (str acc base token-offset sym-tab)
   (let ((c (ptr-read-byte str)))
     (cond
       ((eq c (char-code #\-))
-       (read-negative-number (+ str 1) 0 base token-offset))
+       (read-negative-number (+ str 1) 0 base token-offset sym-tab))
       ((eq c (char-code #\+))
        (read-signed-number (+ str 1) 0 base token-offset))
       (t (read-signed-number str acc base token-offset)))))
@@ -156,8 +161,13 @@
     ((eq c (char-code #\\)) #\\)
     ((eq c (char-code #\/)) #\/)
     ((eq c (char-code #\0)) #\0)
-    ;; todo \xHH \d### \b \v \[a-z] \0
     (t (error 'invalid-escape-error :char c))))
+
+(defun read-number-pair (str base)
+  (let ((a (ptr-read-ubyte str))
+        (b (ptr-read-ubyte (+ 1 str))))
+    (+ (* base (digit-value a))
+               (digit-value b))))
 
 (defun read-string (str output &optional (terminator #\") output-start)
   (let ((c (ptr-read-byte str))
@@ -171,12 +181,12 @@
       ((eq c (char-code #\\))
        (let ((cc (ptr-read-byte (+ 1 str))))
          (cond
+           ;; todo \d### \b \v
            ;; read \xNN escapes
            ((eq cc (char-code #\x))
-            (multiple-value-bind (kind value xoff xtok)
-                (read-signed-number (+ 2 str) 0 16 nil nil)
-              (ptr-write-byte value output)
-              (read-string xoff (+ output 1) terminator (or output-start output))))
+            (let ((n (read-number-pair (+ 2 str) 16)))                
+              (ptr-write-byte n output)
+              (read-string (+ 4 str) (+ output 1) terminator (or output-start output))))
            ;; basic single character escapes: \C
            (t (ptr-write-byte (char-code (unescape-char cc)) output)
               (read-string (+ str 2) (+ output 1) terminator (or output-start output))))))
@@ -220,6 +230,7 @@
     ((string-equal char-sym "Us") #\Us)
     ((string-equal char-sym " ") #\space)
     ((string-equal char-sym "space") #\space)
+    ((string-equal char-sym "rubout") #\rubout)
     ((eq (length char-sym) 1) (string-aref char-sym 0))
     (t (error 'invalid-character-error :value char-sym))
     ))
@@ -246,37 +257,37 @@
       ((not char) (read-character (+ 1 str) token-offset c))
       (t (error 'invalid-character-error :offset str :char c)))))
 
-(defun read-reader-macro (str token-offset)
+(defun read-reader-macro (str token-offset sym-tab)
   (let ((c (ptr-read-byte str)))
     (cond
       ;; #\char
       ((eq c (char-code #\\)) (read-character (+ 1 str) token-offset))
       ;; #xHEX
-      ((or (eq c (char-code #\x)) (eq c (char-code #\X))) (read-number (+ 1 str) 0 16 token-offset))
+      ((or (eq c (char-code #\x)) (eq c (char-code #\X))) (read-number (+ 1 str) 0 16 token-offset sym-tab))
       ;; #+expr
       ((eq c (char-code #\+)) (values 'condition t str token-offset))
       ;; #-expr
       ((eq c (char-code #\-)) (values 'condition nil str token-offset))
       ;; anything else
       ;; todo lookup in table
-      ((eq c (char-code #\:)) (read-symbol str token-offset))
-      ((eq c (char-code #\')) (read-symbol (+ 1 str) token-offset))
+      ((eq c (char-code #\:)) (read-symbol str token-offset sym-tab))
+      ((eq c (char-code #\')) (read-symbol (+ 1 str) token-offset sym-tab))
       (t (error 'invalid-character-error :offset str :char c))
       ))
   )
 
-(defun read-token (str token-offset)
+(defun read-token (str token-offset &optional sym-tab)
   (let ((c (ptr-read-ubyte str)))
     (cond
-      ((space? c) (read-token (+ 1 str) token-offset))
+      ((space? c) (read-token (+ 1 str) token-offset sym-tab))
       ((digit? c) (read-signed-number str 0 *INPUT-BASE* token-offset))
-      ((eq c (char-code #\+)) (read-plus str token-offset))
-      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *INPUT-BASE* token-offset))
-      ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset))
+      ((eq c (char-code #\+)) (read-plus str token-offset sym-tab))
+      ((eq c (char-code #\-)) (read-negative-number (+ 1 str) 0 *INPUT-BASE* token-offset sym-tab))
+      ((eq c (char-code #\#)) (read-reader-macro (+ 1 str) token-offset sym-tab))
       ((or (alpha? c)
-           (symbol-special? c)) (read-symbol str token-offset))
+           (symbol-special? c)) (read-symbol str token-offset sym-tab))
       ((eq c (char-code #\")) (read-string (+ 1 str) token-offset #\"))
-      ((eq c (char-code #\;)) (read-token (read-comment (+ 1 str)) token-offset))
+      ((eq c (char-code #\;)) (read-token (read-comment (+ 1 str)) token-offset sym-tab))
       ((special? c) (values 'special c (+ 1 str) token-offset))
       ((zero? c) (values 'eos nil (+ 1 str) token-offset))
       (t (values 'unknown c (+ 1 str) token-offset)))))

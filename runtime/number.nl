@@ -43,13 +43,16 @@
       count))
 
 (defun count-digits-guesser (n &optional (base *output-base*) (count 0))
-  (let ((guess (count-digits-guess n base))
-        (guess-value (expt-unsigned base guess))
-        (last-digit (/-unsigned n guess-value)))
-    (cond
-      ((>=-unsigned last-digit base) (count-digits-brute (mod-unsigned n guess-value) base guess))
-      ((>=-unsigned last-digit 1) guess)
-      (t (- guess 1)))))
+  (if (eq n 0)
+      0
+      (let ((guess (count-digits-guess n base))
+            (guess-value (expt-unsigned base guess))
+            (last-digit (/-unsigned n guess-value)))
+        (cond
+          ((>=-unsigned last-digit base) (count-digits-brute (mod-unsigned n guess-value) base guess))
+          ((>=-unsigned last-digit 1) guess)
+          ((eq guess 0) 0)
+          (t (- guess 1))))))
 
 (defun count-digits (n &optional (base *output-base*))
   (count-digits-guesser n base))

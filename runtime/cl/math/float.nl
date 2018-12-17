@@ -3,17 +3,17 @@
 
 (in-package :repl)
 
-(defun +-float (a b &optional (c 0.0))
-  (+ a b c))
+(defun +-float (&rest args)
+  (apply #'+ args))
 
-(defun --float (a b &optional (c 0.0))
-  (- a b c))
+(defun --float (&rest args)
+  (apply #'- args))
 
-(defun *-float (a b)
-  (* a b))
+(defun *-float (&rest args)
+  (apply #'* args))
 
-(defun /-float (a b)
-  (/ a b))
+(defun /-float (&rest args)
+  (apply #'/ args))
 
 (defun mod-float (a b)
   (mod a b))
@@ -29,8 +29,3 @@
 
 (defun floorf (n)
   (floor n))
-
-(defun make-float-2i (n f)
-  (+ n (if (> f 0.0)
-           (/ f (expt 10.0 (ceiling (log f 10.0))))
-           0.0)))

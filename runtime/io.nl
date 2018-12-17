@@ -5,7 +5,7 @@
 (require "runtime/math")
 (require "runtime/char")
 (require "runtime/string")
-(require "runtime/itoa")
+(require "runtime/convertors")
 (require "runtime/bc/io/output-dev")
 
 #+:repl
@@ -32,6 +32,9 @@
                                                          (- ending 1)))
                             ((eq spec (char-code #\x)) (multiple-value-bind (start ending)
                                                            (itoa-unsigned a buffer 16)
+                                                         (- ending 1)))
+                            ((eq spec (char-code #\f)) (multiple-value-bind (start ending)
+                                                           (ftoa a buffer 10)
                                                          (- ending 1)))
                             (t (multiple-value-bind (start ending)
                                    (itoa-unsigned a buffer 16)
@@ -73,6 +76,9 @@
                                                           (- ending 1)))
                              ((eq spec (char-code #\x)) (multiple-value-bind (start ending)
                                                             (itoa-unsigned a buffer 16)
+                                                          (- ending 1)))
+                             ((eq spec (char-code #\f)) (multiple-value-bind (start ending)
+                                                            (ftoa a buffer 10)
                                                           (- ending 1)))
                              (t (multiple-value-bind (start ending)
                                     (itoa-unsigned a buffer 16)

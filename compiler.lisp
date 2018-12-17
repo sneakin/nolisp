@@ -28,8 +28,10 @@
 (defvar *allow-tail-calls* t)
 
 (defun compile-read-token (package offset)
+  (logger :debug "pre read-token ~A ~A~%" offset (ptr-read-string offset 64))
   (multiple-value-bind (kind value offset token-offset)
-      (read-token offset (package-string-segment-offset package))
+      (read-token offset (package-string-segment-offset package) (package-string-segment-data package))
+    (logger :debug "read-token ~A ~A ~A~%" offset kind value)
     (set-package-string-segment-offset package token-offset)
     (values kind value offset)))
 

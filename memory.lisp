@@ -264,15 +264,16 @@
 (defun ptr-write-quad (value offset)
   (ptr-write-long (make-ulong value value value value) offset))
 
-(defun ptr-set (offset count &optional (value 0))
+(defun ptr-set (offset count &optional (value 0) (quad (make-ulong value value value value)))
   (if (> count 4)
-      (progn
-        (ptr-write-quad value offset)
-        (ptr-set (+ offset *SIZEOF_LONG*) (- count *SIZEOF_LONG*) value))
+      (ptr-set (ptr-write-long quad offset)
+               (- count *SIZEOF_LONG*)
+               value
+               quad)
       (if (> count 0)
           (progn
             (ptr-write-byte value offset)
-            (ptr-set (+ offset 1) (- count 1) value))
+            (ptr-set (+ offset 1) (- count 1) value quad))
           offset)))
 
 (defun ptr-zero (offset count)

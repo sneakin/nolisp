@@ -31,8 +31,8 @@
                            (+ 1 symbol-offset)
                            symbol-offset))))
 
-(defun symbol-id (symbol-offset &optional (segment (package-string-segment-data *COMPILER*)))
-  (ptr-find-string-equal (ptr-read-string symbol-offset) segment symbol-offset))
+(defun symbol-id (symbol-offset &optional segment)
+  (ptr-find-string-equal (ptr-read-string symbol-offset) (or segment (package-string-segment-data *COMPILER*)) symbol-offset))
 
 #+:repl
 (defun symbol-name (sym)

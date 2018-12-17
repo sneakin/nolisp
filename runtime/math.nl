@@ -3,3 +3,4 @@
 
 (require "runtime/math/signed")
 (require "runtime/math/unsigned")
+(require "runtime/math/float")

@@ -14,10 +14,16 @@
   (asm (load 0 0 11) 12
        (load 1 0 11) 8
        (cls 7)
-       (addi 1 14)
+       (addf 1 14)
        (load 1 0 11) 4
        (cls 7)
        (addf 1 14)))
+
+(def --float (a)
+  (asm (load 0 0 15) 0.0
+       (load 1 0 11) 4
+       (cls 7)
+       (subf 1 14)))
 
 (def --float (a b)
   (asm (load 0 0 11) 8
@@ -29,7 +35,7 @@
   (asm (load 0 0 11) 12
        (load 1 0 11) 8
        (cls 7)
-       (subi 1 14)
+       (subf 1 14)
        (load 1 0 11) 4
        (cls 7)
        (subf 1 14)))
@@ -63,8 +69,19 @@
       (log2-float n)
       (/-float (log2-float n) (log2-float base))))
 
-(defun make-float-2i (n f)
-  (+-float (float n) (if (> f 0)
-                         (/-float (float f)
-                                  (expt-float 10.0 (ceiling (log-float (float f) 10.0))))
-                         0)))
+(def abs-float (n)
+  (if (<-float n 0.0)
+      (--float n)
+      n))
+
+(defun ceiling (n)
+  (asm (load 0 0 11) 4
+       (ceilf 0 0)))
+
+(defun floorf (n)
+  (asm (load 0 0 11) 4
+       (floorf 0 0)))
+
+(defun roundf (n)
+  (asm (load 0 0 11) 4
+       (roundf 0 0)))

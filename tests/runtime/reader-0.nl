@@ -3,10 +3,10 @@
 (require "reader")
 (require "runtime/bc/io")
 (require "runtime/io")
+(require "runtime/math")
 
 (defun vt100-escape (esc)
-  (output-dev-write-byte #\esc)
-  (output-dev-write esc))
+  (format nil "~c~s" #\Esc esc))
 
 (defun vt100-reset-color ()
   (vt100-escape "[0m"))
@@ -30,19 +30,21 @@
 (defun vt100-white ()
   (vt100-escape "[1;37m"))
 
-(defun print-tokens (str len tokens)
+(defun print-tokens (str len tokens &optional (token-offset tokens))
   (if (> len 0)
       (multiple-value-bind (kind value offset token-offset)
-          (read-token str tokens)
+          (read-token str token-offset tokens)
         (format nil "Kind: ~s\tValue: ~d\tOffset: ~d~%" (symbol-name kind) value offset)
         (cond
-          ((eq kind 'symbol) (format nil "\t\"~s\"~%" (symbol-name value)))
-          ((eq kind 'string) (format nil "\t~s~%" value))
+          ((eq kind 'symbol) (format nil "\t\"~s\" ~s~%" (symbol-name value) (if (keyword? value)
+                                                                                 "Keyword"
+                                                                                 "")))
+          ((eq kind 'string) (format nil "\t\"~s\"~%" value))
           ((eq kind 'integer) (format nil "\t~d\t~x~%" value value))
           ((eq kind 'float) (format nil "\t~f~%" value))
           ((eq kind 'EOS) nil))
         (if (not (eq kind 'EOS))
-            (print-tokens offset (- len (- offset str)) tokens)))))
+            (print-tokens offset (- len (- offset str)) tokens token-offset)))))
 
 (defun looper (line-buffer max-line token-buffer)
   (vt100-yellow)
@@ -69,7 +71,9 @@
   (vt100-green)
   (format nil "Hello!~%")
   (with-allocation (line-buffer 1024)
+    (ptr-zero line-buffer 1024)
     (with-allocation (token-buffer 1024)
+      (ptr-zero token-buffer 1024)
       (looper line-buffer 1024 token-buffer))))
 
 (main)

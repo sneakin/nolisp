@@ -20,4 +20,5 @@
 (require "runtime/string")
 (require "runtime/concatenate")
 (require "runtime/package")
+(require "runtime/convertors")
 (require "runtime/io")

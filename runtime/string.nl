@@ -11,11 +11,13 @@
 (defun stringp (str)
   t)
 
-(defun length (str &optional (n 0))
+(defun length (str &optional (max 0) (n 0))
   (if str
       (if (eq (ptr-read-ubyte str) 0)
           n
-          (length (+ str 1) (+ n 1)))))
+          (if (or (= max 0) (< n max))
+              (length (+ str 1) max (+ n 1))
+              n))))
 
 (defun string-aref (str n)
   (ptr-read-ubyte (+ str n)))

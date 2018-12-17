@@ -71,3 +71,8 @@
 
 (def floori (n)
   n)
+
+(def abs-int (n)
+  (if (< n 0)
+      (- n)
+      n))
