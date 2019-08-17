@@ -1,0 +1,3 @@
+[submodule "vendor/bacaw"]
+	path = vendor/bacaw
+	url = git@github.com:sneakin/bacaw.git
