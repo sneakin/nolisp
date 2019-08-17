@@ -1,5 +1,5 @@
-(load "match.lisp")
-(load "nassert.lisp")
+(require "match")
+(require "nassert")
 
 (defun assert-match (input pattern &optional msg (allow-keywords t))
      (multiple-value-bind (matches matched)

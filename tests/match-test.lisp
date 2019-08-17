@@ -1,4 +1,4 @@
-(load "match.lisp")
+(require "match")
 
 (defun test-match ()
   (assert-equal (match '?x 1) '((?x . 1)))
