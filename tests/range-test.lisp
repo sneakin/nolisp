@@ -1,0 +1,18 @@
+(require "nolisp/range")
+(require "testing/nassert")
+
+(defun test-range (&optional (range-fn #'range))
+  (assert-equal (funcall range-fn 5) '(0 1 2 3 4))
+  (assert-equal (funcall range-fn -5) '(-5 -4 -3 -2 -1))
+  (assert-equal (funcall range-fn 0 5) '(0 1 2 3 4))
+  (assert-equal (funcall range-fn 5 0) '(5 4 3 2 1))
+  (assert-equal (funcall range-fn 0 5 1) '(0 1 2 3 4))
+  (assert-equal (funcall range-fn 5 0 1) '(5))
+  (assert-equal (funcall range-fn 5 0 -1) '(5 4 3 2 1))
+  (assert-equal (funcall range-fn 0 5 2) '(0 2 4))
+  (assert-equal (funcall range-fn 0 5 -2) '(0))
+  (assert-equal (funcall range-fn 5 0 2) '(5))
+  (assert-equal (funcall range-fn 5 0 -2) '(5 3 1)))
+
+(defun test-frange ()
+  (test-range #'frange))

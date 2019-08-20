@@ -1,5 +1,5 @@
-(require "match")
-(require "nassert")
+(require "nolisp/match")
+(require "testing/nassert")
 
 (defun assert-match (input pattern &optional msg (allow-keywords t))
      (multiple-value-bind (matches matched)

@@ -1,4 +1,4 @@
-(require "assert-match")
+(require "testing/assert-match")
 
 (defun test-cps-transform ()
   (assert-matches '((abc (return abc))

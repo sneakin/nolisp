@@ -1,5 +1,6 @@
 (require "tests/match-test")
+(require "tests/range-test")
 (require "tests/macroexpand-test")
 (require "tests/cps-transform-test")
-(require "tests/lookup-walker-test")
+(require "tests/lookup-resolver-test")
 (require "tests/compiler-test")

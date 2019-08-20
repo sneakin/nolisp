@@ -1,4 +1,4 @@
-;;; -*- mode: Lisp; coding: utf-8-unix -*-
+;;; -*- mode: Lisp; coding: utf-8-unix; eval: (slime-eval-buffer) -*-
 ;;; Functions to load and reload REPL including module path resolution and loading for SBCL.
 
 (defvar *TOP-MODULE* "nolisp")

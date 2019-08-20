@@ -2,11 +2,12 @@
   `(if ,a
        (progn (format ,stream ".")
               nil)
-       (progn (format ,stream "~&Assertion failed: ~A~%~A~%" ,msg ,a)
+       (progn (format ,stream "~&Assertion failed: ~S~%~S~%~S~%" ,msg ',a ,a)
               t)))
 
-(defun assert-equal (a b &optional msg)
-  (nassert (equal a b) (if msg msg (format nil "(equal ~A ~A)" a b))))
+(defmacro assert-equal (a b &optional msg)
+  `(let ((ar ,a))
+     (nassert (equal ar ,b) ,(if msg msg `(format nil "~S => ~S not ~S" ',a ar ',b)))))
 
 (defun assert-cases (cases fn)
   (mapcar #'(lambda (c) (let ((result (funcall fn (first c))))

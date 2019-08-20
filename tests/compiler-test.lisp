@@ -1,5 +1,5 @@
-(require "compiler")
-(require "assert-match")
+(require "nolisp/compiler")
+(require "testing/assert-match")
 
 (defun test-nc-compile ()
   (assert-matches '((ABC (ABC) "global symbols pass through")

@@ -1,4 +1,4 @@
-(require "nassert")
+(require "testing/nassert")
 
 (defun setup-test ()
   (nc-add-macro 'boo #'(lambda (x y) `(+ ,x ,y)))

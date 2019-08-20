@@ -1,4 +1,4 @@
-(require "assert-match")
+(require "testing/assert-match")
 
 (defun test-lookup-walker ()
   (assert-matches '((x x)
@@ -34,4 +34,4 @@
                                                  (return (lookup 2 0))
                                                  (return y)))))))
                      "nested lambda forms increase lookup depth"))
-                  :fn #'nc-lookup-walker))
+                  :fn #'nc-lookup-resolver))
