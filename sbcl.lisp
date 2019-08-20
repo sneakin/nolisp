@@ -1,4 +1,9 @@
-;;; -*- mode: Lisp; coding: utf-8-unix; eval: (slime-eval-buffer) -*-
+;;; -*- mode: Lisp; coding: utf-8-unix; -*-
+;;; Local Variables:
+;;; eval: (local-set-key [f8] #'slime-eval-buffer)
+;;; eval: (message "Press F8 to eval this buffer.")
+;;; End:
+;;;
 ;;; Functions to load and reload REPL including module path resolution and loading for SBCL.
 
 (defvar *TOP-MODULE* "nolisp")
