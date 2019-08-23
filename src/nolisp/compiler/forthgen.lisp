@@ -74,8 +74,9 @@
                                        frame-return :newline ";")))
 (nc-update-forth-form 'λ #'(lambda (visitor args &rest body)
                              `("(" ,@args ")" :newline
-                                   tail-frame :newline
-                                   ,@(mapcar visitor body))))
+                                   ,@(mapcar visitor body) :newline
+                                   tail-frame
+                                   )))
 (nc-update-forth-form 'LAMBDA #'(lambda (visitor args &rest body)
                                   `("[" begin-frame  "(" CC FP ,@(rest (rest args)) ")" :newline
                                         ,@(mapcar visitor body)
