@@ -5,6 +5,10 @@
   (assert-matches '((ABC (ABC) "global symbols pass through")
                     (123 (123) "integers pass through")
                     ("Hello" ("Hello") "strings pass through")
+                    ((+ 2 3 4) (2 3 4 + return) "math function call")
+                    ((f 2 3 4) (4 3 2 f return) "named function call")
+                    ((f (g)) (g f return) "simple nested function call")
+                    ((f (g 2)) (2 g f return) "simple nested function call with arg")
                     ((+ 2 (* 3 4) 5)
                      (4 3 *
                       5 1 OVERN
@@ -15,7 +19,7 @@
                      (x x *
                       y y *
                       4 overn +)
-                     "Nested function call")
+                     "Two nested function call")
                     ((cons :key (list a (cons x y) (list b c (list d e f) g)))
                      (f e d list
                       g 1 overn c b list

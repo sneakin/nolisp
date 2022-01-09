@@ -5,6 +5,8 @@
                     ((boo 1 2 3) (boo 1 2 3 RETURN))
                     ((boo (who))
                      (who (λ (:R) (boo :R RETURN))))
+                    ((+ 2 (* 3 4) 5)
+                     (* 3 4 (λ (:R) (+ 2 :R 5 RETURN))))
                     ((lambda (x) x) (lambda (:return :fp x) (:return x)))
                     ((lambda (x) (* x x)) (lambda (:return :fp x) (* x x :return)))
                     ((if (> a b) (boo a) (boo b))
