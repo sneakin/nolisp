@@ -1,4 +1,4 @@
-(require "nolisp/math")
+(in-package :nolisp)
 
 (defun frange-inner (a b &optional (step 1) (rev t) (n 0) (fstep (/  step (- b a))) acc)
   (if (and (>= n 0) (< n 1.0))

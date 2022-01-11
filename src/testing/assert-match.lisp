@@ -1,5 +1,4 @@
-(require "nolisp/match")
-(require "testing/nassert")
+(use-package :nolisp)
 
 (defun assert-match (input pattern &optional msg (allow-keywords t))
      (multiple-value-bind (matches matched)

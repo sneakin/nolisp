@@ -1,3 +1,5 @@
+(in-package :nolisp)
+
 (defgeneric nc-error-msg (obj))
 (defgeneric nc-error-form (obj))
 (defgeneric nc-error-state (obj))

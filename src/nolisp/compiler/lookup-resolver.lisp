@@ -1,8 +1,8 @@
-(require "nolisp/fun")
-
 ;;;
 ;;; Variable lookup in call frames
 ;;;
+
+(in-package :nolisp)
 
 (defun make-frame (args &optional parent)
   (cons args parent))
@@ -21,23 +21,23 @@
 
 (defun nc-lookup-form? (form)
   (and (listp form)
-       (or (eq 'ARGN (first form))
-           (eq 'LOOKUP (first form)))))
+       (or (eq 'CL-USER::ARGN (first form))
+           (eq 'CL-USER::LOOKUP (first form)))))
 
 (defun nc-lookup-resolver-atom (form state &optional (depth 0))
   (multiple-value-bind (index depth)
       (frame-lookup state form)
     (if index
         (if (eq depth 0)
-            (list 'ARGN index)
-            (list 'LOOKUP depth index))
+            (list 'CL-USER::ARGN index)
+            (list 'CL-USER::LOOKUP depth index))
         form)))
 
 (defun nc-lookup-resolver-call (visitor state name args &optional ops)
   (if args
       (nc-lookup-resolver-call visitor state
                              name (rest args)
-                             (cons (funcall (curry-after visitor state) (first args)) ops))
+                             (cons (funcall (partial-after visitor state) (first args)) ops))
       (nreverse ops)))
 
 (defun nc-lookup-resolver-list (form visitor state)
@@ -45,18 +45,18 @@
     (LAMBDA (let ((args (second form))
                   (body (rest (rest form))))
               `(LAMBDA ,args
-                 ,@(mapcar (curry-after visitor (make-frame args state))
+                 ,@(mapcar (partial-after visitor (make-frame args state))
                            body))))
-    (λ (let ((args (second form))
+    (CL-USER::λ (let ((args (second form))
              (body (rest (rest form))))
-         `(λ ,args
-             ,@(mapcar (curry-after visitor (make-frame args state))
+         `(CL-USER::λ ,args
+             ,@(mapcar (partial-after visitor (make-frame args state))
                        body))))
     (DEFUN (let ((name (second form))
                  (args (third form))
                  (body (rest (rest (rest form)))))
              `(DEFUN ,name ,args
-                ,@(mapcar (curry-after visitor (make-frame args)) body))))
+                ,@(mapcar (partial-after visitor (make-frame args)) body))))
     (t (if (nc-lookup-form? form)
            form
            (cons (first form)

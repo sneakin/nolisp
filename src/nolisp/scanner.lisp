@@ -1,4 +1,4 @@
-(require "nolisp/error")
+(in-package :nolisp)
 
 (define-condition nc-scanner-error (nc-error) ())
 

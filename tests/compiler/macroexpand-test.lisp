@@ -1,5 +1,3 @@
-(require "testing/nassert")
-
 (defun setup-test ()
   (nc-add-macro 'boo #'(lambda (x y) `(+ ,x ,y)))
   (nc-add-macro 'who #'(lambda (x y) `(boo ,x ,y)))

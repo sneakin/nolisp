@@ -1,3 +1,5 @@
+(in-package :nolisp)
+
 (defun match-var? (sym &optional (allow-keywords t))
   (if (symbolp sym)
       (or (eq 0 (position #\? (symbol-name sym)))
@@ -13,8 +15,7 @@
                (values syms nil))
            (values (acons pattern atom syms) T))))
     ((funcall test pattern atom) (values syms T))
-    (t (values syms nil))
-    ))
+    (t (values syms nil))))
 
 (defun match (pattern lst &key syms (allow-keywords t) (test #'equal))
   (cond

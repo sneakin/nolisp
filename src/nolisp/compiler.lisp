@@ -1,12 +1,8 @@
-(require "nolisp/compiler/errors")
-(require "nolisp/compiler/macroexpand")
-(require "nolisp/compiler/cps-transform")
-(require "nolisp/compiler/lookup-resolver")
-(require "nolisp/compiler/forthgen")
+;;;
+;;; Compiler API
+;;;
 
-;;;
-;;; Compiler
-;;;
+(in-package :nolisp)
 
 (defun nc-list-compile (form)
   (nc-forthgen (nc-lookup-resolver (nc-cps-transform (nc-macroexpand form)))))

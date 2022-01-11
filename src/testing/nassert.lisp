@@ -10,8 +10,9 @@
      (nassert (equal ar ,b) ,(if msg msg `(format nil "~S => ~S not ~S" ',a ar ',b)))))
 
 (defun assert-cases (cases fn)
-  (mapcar #'(lambda (c) (let ((result (funcall fn (first c))))
-                          (assert-equal result
-                                        (second c)
-                                        (format nil "~A~%'~A =>~%     ~A~%Not '~A" (third c) (first c) result (second c)))))
+  (mapcar #'(lambda (c)
+	      (let ((result (funcall fn (first c))))
+                (assert-equal result
+                              (second c)
+                              (format nil "~A~%'~A =>~%     ~A~%Not '~A" (third c) (first c) result (second c)))))
           cases))

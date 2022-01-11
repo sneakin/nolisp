@@ -1,6 +1,3 @@
-(require "nolisp/match")
-(require "testing/nassert")
-
 (defun test-match ()
   (assert-equal (match '?x 1) '((?x . 1)))
   (assert-equal (match :x 1) '((:x . 1)))

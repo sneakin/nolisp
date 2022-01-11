@@ -1,6 +1,9 @@
 ;;;
 ;;; Utility functions
 ;;;
+
+(in-package :nolisp)
+
 (defun flatten (lst &optional result (top t))
   (if lst
       (if (atom lst)
@@ -23,4 +26,4 @@
   (append (rest lst) (list (first lst))))
 
 (defun shift-right (lst)
-  (nreverse (shift-left (reverse lst))))
+  (nreverse (nolisp:shift-left (reverse lst))))

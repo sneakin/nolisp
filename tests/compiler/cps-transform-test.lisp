@@ -1,5 +1,3 @@
-(require "testing/assert-match")
-
 (defun test-cps-transform ()
   (assert-matches '((abc (return abc))
                     ((boo 1 2 3) (boo 1 2 3 RETURN))

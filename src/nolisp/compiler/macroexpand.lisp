@@ -1,8 +1,8 @@
-(require "nolisp/scanner")
-
 ;;;
 ;;; Macroexpand
 ;;;
+
+(in-package :nolisp)
 
 (defvar *macros* '())
 

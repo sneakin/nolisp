@@ -1,5 +1,3 @@
-(require "testing/assert-match")
-
 (defun test-lookup-walker ()
   (assert-matches '((x x)
                     ((defun f (x y)

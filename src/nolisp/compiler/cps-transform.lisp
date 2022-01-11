@@ -1,28 +1,27 @@
-(require "nolisp/error")
-(require "nolisp/scanner")
-
 ;;;
 ;;; CPS Transform
 ;;;
+
+(in-package :nolisp)
 
 (define-condition nc-cps-transform-error (nc-error) ())
 
 (defun cps-atom? (form)
   (or (atom form)
-      (eq 'LAMBDA (first form))
-      (eq 'λ (first form))))
+      (eq 'CL-USER::LAMBDA (first form))
+      (eq 'CL-USER::λ (first form))))
 
 (defun cps-wrap (sym form cc)
   (cond
     ((or (null cc) (eq sym cc)) form)
     ((cps-atom? cc) `(,@form ,cc))
-    (t `(,@form (λ (,sym) ,cc)))))
+    (t `(,@form (CL-USER::λ (,sym) ,cc)))))
 
 (defun cps-lambda (sym form)
-  `(λ (,sym) ,form))
+  `(CL-USER::λ (,sym) ,form))
 
 (defun lambda-form? (form)
-  (and (listp form) (eq 'LAMBDA (first form))))
+  (and (listp form) (eq 'CL-USER::LAMBDA (first form))))
 
 (defun nc-cps-transform-call-emit (fns ops visitor &optional (first-call t))
   (if fns
@@ -62,19 +61,19 @@
     (nil state)
     (IF
      (funcall visitor (second form)
-              `(λ (test)
-                  (if test
+              `(CL-USER::λ (cl-user::test)
+                  (if cl-user::test
                       ,(funcall visitor (third form) state)
                       ,(funcall visitor (fourth form) state)))))
     (LAMBDA (let ((cc (gensym "CC"))
                   (fp (gensym "FP")))
-              `(LAMBDA (,cc ,fp ,@(second form))
+              `(CL:LAMBDA (,cc ,fp ,@(second form))
                  ,(funcall visitor (if (fourth form)
                                        (rest (rest form))
                                        (third form))
                            cc))))
     (DEFUN (let ((cc (gensym "CC")))
-             `(DEFUN ,(second form) (,cc ,@(third form))
+             `(CL:DEFUN ,(second form) (,cc ,@(third form))
                 ,(funcall visitor (if (fifth form)
                                       (rest (rest (rest form)))
                                       (fourth form))
@@ -92,9 +91,9 @@
   (cond
     ((null state) atom)
     ((atom state) (list state atom))
-    ((eq 'λ (first state)) (nc-cps-uncurry state atom))
+    ((eq 'CL-USER::λ (first state)) (nc-cps-uncurry state atom))
     (state (list state atom))
     (t (error 'nc-cps-transform-error :form form :state state))))
 
-(defun nc-cps-transform (form &optional (state 'RETURN))
+(defun nc-cps-transform (form &optional (state 'CL-USER::RETURN))
   (scan-list form #'nc-cps-transform-lookup #'nc-cps-transform-list state))
