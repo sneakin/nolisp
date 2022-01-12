@@ -36,4 +36,4 @@
                      (if night (boo you RETURN) (boo me RETURN)))
                     ((defun fn (x) (* x x))
                      (defun fn (:return x) (* x x :return))))
-                  :fn #'nc-cps-transform))
+                  :fn #'nolisp:cps-transform))

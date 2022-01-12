@@ -1,6 +1,6 @@
 (in-package :nolisp)
 
-(define-condition nc-scanner-error (nc-error) ())
+(define-condition scanner-error (nolisp-error) ())
 
 ;;;
 ;;; The list scanner
@@ -14,4 +14,4 @@
   (cond
     ((atom form) (funcall atom-visitor form state))
     ((listp form) (funcall list-visitor form recurser state))
-    (t (error 'nc-scanner-error :form form :state state))))
+    (t (error 'scanner-error :form form :state state))))

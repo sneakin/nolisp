@@ -4,6 +4,6 @@
 
 (in-package :nolisp)
 
-(define-condition nc-unknown-error (nc-error) ())
-(define-condition nc-macro-exists-error (nc-error) ())
-(define-condition nc-undefined-error (nc-error) ())
+(define-condition unknown-error (nolisp-error) ())
+(define-condition macro-exists-error (nolisp-error) ())
+(define-condition undefined-error (nolisp-error) ())

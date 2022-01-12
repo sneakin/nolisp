@@ -32,4 +32,4 @@
                                                  (return (lookup 2 0))
                                                  (return y)))))))
                      "nested lambda forms increase lookup depth"))
-                  :fn #'nc-lookup-resolver))
+                  :fn #'nolisp:lookup-resolver))

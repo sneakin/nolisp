@@ -7,8 +7,8 @@
 
 (test-match)
 (test-range)
-(test-nc-macroexpand-1)
-(test-nc-macroexpand)
+(test-macro-expand-1)
+(test-macro-expand)
 (test-lookup-walker)
 (test-cps-transform)
 (test-nc-compile)

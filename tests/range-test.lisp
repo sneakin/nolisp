@@ -1,4 +1,4 @@
-(defun test-range (&optional (range-fn #'range))
+(defun test-range (&optional (range-fn #'nolisp:range))
   (assert-equal (funcall range-fn 5) '(0 1 2 3 4))
   (assert-equal (funcall range-fn -5) '(-5 -4 -3 -2 -1))
   (assert-equal (funcall range-fn 0 5) '(0 1 2 3 4))
@@ -12,4 +12,4 @@
   (assert-equal (funcall range-fn 5 0 -2) '(5 3 1)))
 
 (defun test-frange ()
-  (test-range #'frange))
+  (test-range #'nolisp:frange))

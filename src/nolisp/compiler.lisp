@@ -4,11 +4,11 @@
 
 (in-package :nolisp)
 
-(defun nc-list-compile (form)
-  (nc-forthgen (nc-lookup-resolver (nc-cps-transform (nc-macroexpand form)))))
+(defun list-compile (form)
+  (forthgen (lookup-resolver (cps-transform (macro-expand form)))))
 
-(defun nc-compile (form)
-  (flatten (nc-forthgen (nc-lookup-resolver (nc-cps-transform (nc-macroexpand form))))))
+(defun compile-form (form)
+  (flatten (forthgen (lookup-resolver (cps-transform (macro-expand form))))))
 
-(defun nc-to-string (form)
+(defun to-string (form)
   (format nil "~{~A ~}" (substitute "" :var (substitute "" :call (substitute (format nil "~%") :newline form)))))

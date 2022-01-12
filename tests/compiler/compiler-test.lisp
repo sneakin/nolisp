@@ -83,5 +83,5 @@
                       frame-return :newline
                       ";")
                      "function returning an anonymous function"))
-                  :fn #'nc-compile
+                  :fn #'nolisp:compile-form
                   :allow-keywords nil))

@@ -1,8 +1,6 @@
-(use-package :nolisp)
-
 (defun assert-match (input pattern &optional msg (allow-keywords t))
      (multiple-value-bind (matches matched)
-         (match pattern input :allow-keywords allow-keywords)
+         (nolisp:match pattern input :allow-keywords allow-keywords)
        (nassert matched
                 (or msg (format nil "Pattern does not match:~%Input: ~S~%Pattern: ~S~%"
                                 input pattern)))))

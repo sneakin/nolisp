@@ -19,12 +19,12 @@
             (frame-lookup (frame-parent frame) sym (+ depth 1))))
       ))
 
-(defun nc-lookup-form? (form)
+(defun lookup-form? (form)
   (and (listp form)
        (or (eq 'CL-USER::ARGN (first form))
            (eq 'CL-USER::LOOKUP (first form)))))
 
-(defun nc-lookup-resolver-atom (form state &optional (depth 0))
+(defun lookup-resolver-atom (form state &optional (depth 0))
   (multiple-value-bind (index depth)
       (frame-lookup state form)
     (if index
@@ -33,14 +33,14 @@
             (list 'CL-USER::LOOKUP depth index))
         form)))
 
-(defun nc-lookup-resolver-call (visitor state name args &optional ops)
+(defun lookup-resolver-call (visitor state name args &optional ops)
   (if args
-      (nc-lookup-resolver-call visitor state
+      (lookup-resolver-call visitor state
                              name (rest args)
                              (cons (funcall (partial-after visitor state) (first args)) ops))
       (nreverse ops)))
 
-(defun nc-lookup-resolver-list (form visitor state)
+(defun lookup-resolver-list (form visitor state)
   (case (first form)
     (LAMBDA (let ((args (second form))
                   (body (rest (rest form))))
@@ -57,13 +57,13 @@
                  (body (rest (rest (rest form)))))
              `(DEFUN ,name ,args
                 ,@(mapcar (partial-after visitor (make-frame args)) body))))
-    (t (if (nc-lookup-form? form)
+    (t (if (lookup-form? form)
            form
            (cons (first form)
-                 (nc-lookup-resolver-call visitor state (first form) (rest form))
+                 (lookup-resolver-call visitor state (first form) (rest form))
                  )))))
 
-(defun nc-lookup-resolver (form)
+(defun lookup-resolver (form)
   (scan-list form
-             #'nc-lookup-resolver-atom
-             #'nc-lookup-resolver-list))
+             #'lookup-resolver-atom
+             #'lookup-resolver-list))

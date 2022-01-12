@@ -5,9 +5,9 @@
 	   match
 	   lerp
 	   frange range
-	   nc-scanner-error scan-list
-	   nc-error-msg nc-error-form nc-error-state nc-error
-	   nc-add-macro nc-remove-macro nc-macroexpand-1 nc-macroexpand
-	   nc-lookup-resolver
-	   nc-cps-transform
-	   nc-list-compile nc-compile nc-to-string))
+	   scanner-error scan-list
+	   error-msg error-form error-state error
+	   add-macro remove-macro macro-expand-1 macro-expand
+	   lookup-resolver
+	   cps-transform
+	   list-compile compile-form to-string))

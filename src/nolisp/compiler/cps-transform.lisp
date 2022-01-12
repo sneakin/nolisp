@@ -4,7 +4,7 @@
 
 (in-package :nolisp)
 
-(define-condition nc-cps-transform-error (nc-error) ())
+(define-condition cps-transform-error (nolisp-error) ())
 
 (defun cps-atom? (form)
   (or (atom form)
@@ -23,40 +23,40 @@
 (defun lambda-form? (form)
   (and (listp form) (eq 'CL-USER::LAMBDA (first form))))
 
-(defun nc-cps-transform-call-emit (fns ops visitor &optional (first-call t))
+(defun cps-transform-call-emit (fns ops visitor &optional (first-call t))
   (if fns
       (let* ((form (rest (first fns)))
              (sym (first (first fns)))
              (new-form (funcall visitor form (cps-lambda sym ops))))
-        (nc-cps-transform-call-emit (rest fns)
+        (cps-transform-call-emit (rest fns)
                                     new-form
                                     visitor
                                     nil))
       ops))
 
-(defun nc-cps-transform-call-inner (form visitor state &optional args fns (sym (gensym "R")))
+(defun cps-transform-call-inner (form visitor state &optional args fns (sym (gensym "R")))
   (if form
       (let ((tip (first form)))
         (if (cps-atom? tip)
-            (nc-cps-transform-call-inner (rest form) visitor state
+            (cps-transform-call-inner (rest form) visitor state
                                          (cons (if (lambda-form? tip)
                                                    (funcall visitor tip)
                                                    tip)
                                                args)
                                          fns
                                          sym)
-            (nc-cps-transform-call-inner (rest form) visitor state
+            (cps-transform-call-inner (rest form) visitor state
                                          (cons sym args)
                                          (acons sym tip fns)
                                          (gensym "R"))))
-      (nc-cps-transform-call-emit fns
+      (cps-transform-call-emit fns
                                   (cps-wrap sym (reverse args) state)
                                   visitor)))
 
-(defun nc-cps-transform-call (form visitor state)
-  (nc-cps-transform-call-inner form visitor state))
+(defun cps-transform-call (form visitor state)
+  (cps-transform-call-inner form visitor state))
 
-(defun nc-cps-transform-list (form visitor state)
+(defun cps-transform-list (form visitor state)
   (case (first form)
     (nil state)
     (IF
@@ -78,22 +78,22 @@
                                       (rest (rest (rest form)))
                                       (fourth form))
                           cc))))
-    (t (nc-cps-transform-call form visitor state))))
+    (t (cps-transform-call form visitor state))))
 
-(defun nc-cps-uncurry (form value)
+(defun cps-uncurry (form value)
   (let ((body (subst value (first (second form)) (third form))))
     (if (eq 1 (length (second form)))
         body
         `(,(first form) ,(rest (second form))
            ,body))))
 
-(defun nc-cps-transform-lookup (atom state)
+(defun cps-transform-lookup (atom state)
   (cond
     ((null state) atom)
     ((atom state) (list state atom))
-    ((eq 'CL-USER::λ (first state)) (nc-cps-uncurry state atom))
+    ((eq 'CL-USER::λ (first state)) (cps-uncurry state atom))
     (state (list state atom))
-    (t (error 'nc-cps-transform-error :form form :state state))))
+    (t (error 'cps-transform-error :form form :state state))))
 
-(defun nc-cps-transform (form &optional (state 'CL-USER::RETURN))
-  (scan-list form #'nc-cps-transform-lookup #'nc-cps-transform-list state))
+(defun cps-transform (form &optional (state 'CL-USER::RETURN))
+  (scan-list form #'cps-transform-lookup #'cps-transform-list state))
