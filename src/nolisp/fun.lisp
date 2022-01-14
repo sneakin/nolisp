@@ -4,9 +4,6 @@
   #'(lambda (x)
       (eq x a)))
 
-(defmacro napply (fn args)
-  `(funcall ,fn ,@args))
-
 (defmacro compose (&rest fns)
   `(lambda (&rest args)
      ,(reduce #'(lambda (acc fn) `(funcall ,fn ,acc))

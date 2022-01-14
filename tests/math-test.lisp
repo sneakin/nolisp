@@ -1,0 +1,8 @@
+(defun test-lerp ()
+  (assert-equal (lerp -10 10 -1) -30)
+  (assert-equal (lerp -10 10 0) -10)
+  (assert-equal (lerp -10 10 0.25) -5.0)
+  (assert-equal (lerp -10 10 0.5) 0.0)
+  (assert-equal (lerp -10 10 0.75) 5.0)
+  (assert-equal (lerp -10 10 1.0) 10.0)
+  (assert-equal (lerp -10 10 2.0) 30.0))

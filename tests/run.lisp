@@ -15,6 +15,10 @@
 
 (test-match)
 (test-range)
+(test-fun)
+(test-list)
+(test-lerp)
+(test-scan-list)
 (test-macro-expand-1)
 (test-macro-expand)
 (test-lookup-walker)

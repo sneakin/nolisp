@@ -1,7 +1,7 @@
 (defpackage :nolisp
   (:use :cl)
   (:export flatten clip-last nshift-left shift-left shift-right
-	   ifeq napply compose partial-first partial-after
+	   ifeq compose partial-first partial-after
 	   match
 	   lerp
 	   frange range
