@@ -1,4 +1,4 @@
-(defun test-nc-compile ()
+(defun test-compile ()
   (assert-matches '((ABC (ABC) "global symbols pass through")
                     (123 (123) "integers pass through")
                     ("Hello" ("Hello") "strings pass through")

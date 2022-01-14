@@ -23,4 +23,4 @@
 (test-macro-expand)
 (test-lookup-walker)
 (test-cps-transform)
-(test-nc-compile)
+(test-compile)

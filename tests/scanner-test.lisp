@@ -30,7 +30,7 @@
   'atom)
 
 (defun test-scan-list-recurse-list-visitor (lst recursor state)
-  (nassert (listp l) "is a list")
+  (nassert (listp lst) "is a list")
   (append state (mapcar (partial-after recursor nil) lst)))
 
 (defun test-scan-list-recurse ()
