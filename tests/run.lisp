@@ -1,4 +1,3 @@
-#!/usr/bin/env -S ecl --shell
 ;;; Loads nolisp and all the test files and then executes the test functions.
 
 (require :asdf)
@@ -33,6 +32,3 @@
   (test-cps-transform)
   (test-compile)
   t)
-
-(eval-when (:execute)
- (run-tests))
