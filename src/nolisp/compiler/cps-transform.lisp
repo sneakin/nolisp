@@ -93,7 +93,7 @@
     ((atom state) (list state atom))
     ((eq 'CL-USER::λ (first state)) (cps-uncurry state atom))
     (state (list state atom))
-    (t (error 'cps-transform-error :form form :state state))))
+    (t (error 'cps-transform-error :form atom :state state))))
 
 (defun cps-transform (form &optional (state 'CL-USER::RETURN))
   (scan-list form #'cps-transform-lookup #'cps-transform-list state))
