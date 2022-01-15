@@ -1,3 +1,6 @@
+#!/usr/bin/env -S ecl --shell
+;;; Loads nolisp and all the test files and then executes the test functions.
+
 (require :asdf)
 (require :nolisp)
 
@@ -7,20 +10,29 @@
 (load "src/testing/assert-match.lisp")
 
 (defun load-test-units ()
-  (let ((testdir (namestring (first (directory "./")))))
-    (mapcar #'(lambda (p) (print p) (load p))
-            (directory "./tests/**/*-test.lisp"))))
+  (mapcar #'load (directory "./tests/**/*-test.lisp")))
 
 (load-test-units)
 
-(test-match)
-(test-range)
-(test-fun)
-(test-list)
-(test-lerp)
-(test-scan-list)
-(test-macro-expand-1)
-(test-macro-expand)
-(test-lookup-walker)
-(test-cps-transform)
-(test-compile)
+(defun reload! ()
+  (asdf:load-system :nolisp)
+  (load "tests/run.lisp")
+  t)
+
+;;; Execute the test functions.
+(defun run-tests ()
+  (test-match)
+  (test-range)
+  (test-fun)
+  (test-list)
+  (test-lerp)
+  (test-scan-list)
+  (test-macro-expand-1)
+  (test-macro-expand)
+  (test-lookup-walker)
+  (test-cps-transform)
+  (test-compile)
+  t)
+
+(eval-when (:execute)
+ (run-tests))
