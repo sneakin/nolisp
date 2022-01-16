@@ -1,0 +1,55 @@
+#+TITLE NoLisp3
+
+A proto-Lisp compiler that transforms to continuation passing style and then
+into a Forth dialect.
+
+More a proof of concept than useful.
+
+* Dependencies
+
+  * A Common Lisp: tested with SBCL and ECL
+  * ASDF
+
+* Installation
+
+** Development
+
+Configure ASDF's source registry so it can find ~nolisp.asd~:
+
+#+BEGIN_SRC shell
+export NOLISP=$(pwd)
+mkdir -p ~/.config/common-lisp/source-registry.conf.d
+echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.conf.d/nolisp.conf
+#+END_SRC
+
+* Usage
+
+** Loading
+
+#+BEGIN_SRC lisp
+(require :asdf)
+(require :nolisp)
+#+END_SRC
+
+** Tests
+
+*** From Lisp
+
+#+BEGIN_SRC lisp
+(load "tests/run.lisp")
+(run-tests)
+#+END_SRC
+
+*** From Unix shell
+
+Using SBCL:
+
+#+BEGIN_SRC shell
+sbcl --script ./tests/run-sbcl.lisp
+#+END_SRC
+
+Using ECL:
+
+#+BEGIN_SRC shell
+ecl --shell ./tests/run-ecl.lisp
+#+END_SRC
