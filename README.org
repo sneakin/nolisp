@@ -1,6 +1,7 @@
-#+TITLE NoLisp3
+#+TITLE: NoLisp3
+#+AUTHOR: Nolan Eakins <sneakin@semanticgap.com>
 
-A proto-Lisp compiler that transforms to continuation passing style and then
+A proof of concept Lisp compiler that transforms to continuation passing style and then
 into a Forth dialect.
 
 More a proof of concept than useful.
@@ -17,9 +18,18 @@ More a proof of concept than useful.
 Configure ASDF's source registry so it can find ~nolisp.asd~:
 
 #+BEGIN_SRC shell
-export NOLISP=$(pwd)
-mkdir -p ~/.config/common-lisp/source-registry.conf.d
-echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.conf.d/nolisp.conf
+  export NOLISP=$(pwd)
+  mkdir -p ~/.config/common-lisp/source-registry.conf.d
+  echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.conf.d/nolisp.conf
+#+END_SRC
+
+Or by adding the NoLisp directory to ~asdf:*centrol-registry*~:
+
+#+BEGIN_SRC lisp
+  (setf asdf:*central-registry*
+	(list* '*default-pathname-defaults*
+		#p"/home/me/nolisp/" ;; change for your system
+		asdf:*central-registry*))
 #+END_SRC
 
 * Usage
@@ -27,8 +37,9 @@ echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.
 ** Loading
 
 #+BEGIN_SRC lisp
-(require :asdf)
-(require :nolisp)
+  (require :asdf)
+  ;; possibly update asdf:*central-registry*
+  (require :nolisp)
 #+END_SRC
 
 ** Tests
@@ -36,8 +47,8 @@ echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.
 *** From Lisp
 
 #+BEGIN_SRC lisp
-(load "tests/run.lisp")
-(run-tests)
+  (load "tests/run.lisp")
+  (run-tests)
 #+END_SRC
 
 *** From Unix shell
@@ -45,11 +56,11 @@ echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.
 Using SBCL:
 
 #+BEGIN_SRC shell
-sbcl --script ./tests/run-sbcl.lisp
+  sbcl --script ./tests/run-sbcl.lisp
 #+END_SRC
 
 Using ECL:
 
 #+BEGIN_SRC shell
-ecl --shell ./tests/run-ecl.lisp
+  ecl --shell ./tests/run-ecl.lisp
 #+END_SRC
