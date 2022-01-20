@@ -19,19 +19,23 @@
   (remove-forth-form name)
   (add-forth-form name fn))
 
+(defmacro define-forth-form (name arglist &rest body)
+  `(update-forth-form ',(intern (symbol-name name) :cl-user)
+		      #'(lambda ,arglist ,@body)))
+
 (defun forthgen-arg-loaders (args &optional ops (offset 0))
   (if args
       (let ((item (first args)))
         (if (atom item)
             (forthgen-arg-loaders (rest args)
-                                     (cons (first args) ops)
-                                     (+ offset 1))
+                                  (cons (first args) ops)
+                                  (+ offset 1))
             (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
               (forthgen-arg-loaders (rest args)
-                                       (if (> offset 0)
-                                           (cons `(,offset overn) ops)
-                                           ops)
-                                       new-offset))))
+                                    (if (> offset 0)
+                                        (cons `(,offset overn) ops)
+                                      ops)
+                                    new-offset))))
       
       (nreverse ops)))
 
@@ -54,40 +58,51 @@
         (forthgen-funcall visitor state name (shift-right args)))))
 
 (defun forthgen-lookup (sym state)
-  (identity sym))
+  (cond
+   ((eq sym 'CL-USER::return) 'CL-USER::exit-frame)
+   (t (identity sym))))
 
 (defun forthgen (form)
   (scan-list form
              #'forthgen-lookup
              #'forthgen-list))
 
-(update-forth-form 'CL-USER::IF #'(lambda (visitor test then else)
-                              `(,(funcall visitor test) CL-USER::IF :newline
-                                 ,(funcall visitor then) CL-USER::ELSE :newline
-                                 ,(funcall visitor else) CL-USER::THEN :newline)))
-(update-forth-form 'CL-USER::DEFUN #'(lambda (visitor name args &rest body)
-                                 `(":" ,name "(" CL-USER::CC ,@(rest args) ")" :newline
-                                       CL-USER::begin-frame :newline
-                                       ,@(mapcar visitor body)
-                                       CL-USER::frame-return :newline ";")))
-(update-forth-form 'CL-USER::λ #'(lambda (visitor args &rest body)
-                             `("(" ,@args ")" :newline
-                                   ,@(mapcar visitor body) :newline
-                                   CL-USER::tail-frame
-                                   )))
-(update-forth-form 'CL-USER::LAMBDA #'(lambda (visitor args &rest body)
-                                  `("[" CL-USER::begin-frame  "(" CL-USER::CC CL-USER::FP ,@(rest (rest args)) ")" :newline
-                                        ,@(mapcar visitor body)
-                                        CL-USER::frame-return :newline
-                                        "]" CL-USER::close-lambda :newline)))
-(update-forth-form 'CL-USER::PROGN #'(lambda (visitor &rest calls)
-                                 (mapcar visitor calls)))
-(update-forth-form 'CL-USER::RETURN #'(lambda (visitor arg)
-                                  (funcall visitor arg)))
-(update-forth-form 'CL-USER::ARGN #'(lambda (visitor n)
-                                `(CL-USER::ARGN> ,n)))
-(update-forth-form 'CL-USER::LOOKUP #'(lambda (visitor depth n)
-                                  `(CL-USER::LOOKUP> ,depth ,n)))
+(define-forth-form IF (visitor test then else)
+  `(,(funcall visitor test) CL-USER::IF :newline
+    ,(funcall visitor then) CL-USER::ELSE :newline
+    ,(funcall visitor else) CL-USER::THEN :newline))
+
+(define-forth-form DEFUN (visitor name args &rest body)
+  `(":" ,name "(" ,@(reverse args) ")" :newline
+    CL-USER::begin-frame :newline
+    ,@(mapcar visitor body)
+    CL-USER::end-frame :newline ";"))
+
+(define-forth-form λ (visitor args &rest body)
+  `(:newline
+    CL-USER::begin-frame "(" ,@args ")" :newline
+    ,@(mapcar visitor body)
+    CL-USER::end-frame :newline))
+
+(define-forth-form LAMBDA (visitor args &rest body)
+  `("[" CL-USER::begin-frame  "(" ,@args ")" :newline
+    ,@(mapcar visitor body)
+    CL-USER::frame-return :newline
+    CL-USER::end-frame :newline
+    "]" CL-USER::close-lambda))
+
+(define-forth-form PROGN (visitor &rest calls)
+  (mapcar visitor calls))
+
+(define-forth-form RETURN (visitor arg)
+  (list (funcall visitor arg)
+	'CL-USER::exit-frame))
+
+(define-forth-form ARGN (visitor n)
+  `(,n CL-USER::ARGN))
+
+(define-forth-form LOOKUP (visitor depth n)
+  `(,n ,depth CL-USER::LOOKUP))
 
 (defun forthgen-arg-reverser (op)
   #'(lambda (visitor &rest args)
@@ -99,4 +114,3 @@
 	 #'(lambda (op) (intern (symbol-name op) :cl-user))
 	 #'(lambda (op) (update-forth-form op (forthgen-arg-reverser op))))
 	'(+ - * / < <= >= > ^ **))
-

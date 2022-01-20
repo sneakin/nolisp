@@ -1,22 +1,14 @@
 (defun test-compile ()
-  (assert-matches '((ABC (ABC) "global symbols pass through")
-                    (123 (123) "integers pass through")
-                    ("Hello" ("Hello") "strings pass through")
-                    ((+ 2 3 4) (2 3 4 + return) "math function call")
-                    ((f 2 3 4) (4 3 2 f return) "named function call")
-                    ((f (g)) (g f return) "simple nested function call")
-                    ((f (g 2)) (2 g f return) "simple nested function call with arg")
-                    ((+ 2 (* 3 4) 5)
-                     (4 3 *
-                      5 1 OVERN
-                      2 +)
-                     "nested function call")
-                    ((+ (* x x)
-                      (* y y))
-                     (x x *
-                      y y *
-                      4 overn +)
-                     "Two nested function call")
+  (assert-matches '((ABC (ABC exit-frame) "global symbols pass through")
+                    (123 (123 exit-frame) "integers pass through")
+                    ("Hello" ("Hello" exit-frame) "strings pass through")
+                    ((+ 2 3 4) (2 3 4 + exit-frame) "math function call")
+                    ((f 2 3 4) (4 3 2 f exit-frame) "named function call")
+                    ((f (g)) (g f exit-frame) "simple nested function call")
+                    ((f (g 2)) (2 g f exit-frame) "simple nested function call with arg")
+                    ((f 1 (g 2) 3) (2 g 3 2 overn 1 f exit-frame) "simple nested function call surrounded by args")
+                    ((+ 2 (* 3 4) 5) (4 3 * 5 1 OVERN 2 +) "nested function call")
+                    ((+ (* x x) (* y y)) (x x * y y * +) "Two nested function call")
                     ((cons :key (list a (cons x y) (list b c (list d e f) g)))
                      (f e d list
                       g 1 overn c b list
@@ -31,56 +23,57 @@
                       100 1 overn 6 overn f)
                      "can find arguments after an arbitray stack size increase")
                     ((/ 1 (/ 1 (/ 1 e))) ; todo proper math arg ordering
-                     (e 1 /
-                      1 /
-                      1 /)
-                     "doubly nested")
-                    ((defun fn ()
-                       123)
-                     (":" fn "(" ")" :NEWLINE
-                      begin-frame :NEWLINE
+                     (e 1 / 1 / 1 /) "doubly nested")
+		    ((if (> x y) x y) (y x > IF x ELSE y THEN) "top level if")
+                    ((defun fn () 123)
+                     (":" fn "(" ")" :newline
+                      begin-frame :newline
                       123
-                      frame-return :NEWLINE
+                      frame-return :newline
+		      end-frame :newldne
                       ";")
                      "defun returning a value")
-                    ((defun fn (x y)
-                       (+ x y))
-                     (":" fn "(" x y ")" :NEWLINE
-                      begin-frame :NEWLINE
+                    ((defun fn (x y) (+ x y))
+                     (":" fn "(" x y ")" :newline
+                      begin-frame :newline
                       1 argn 0 argn +
-                      frame-return :NEWLINE
+                      frame-return :newline
+		      end-frame :newline
                       ";")
                      "defun with one call")
-                    ((defun mag (x y)
-                       (+ (* x x) (* y y)))
-                     (":" mag "(" x y ")" :NEWLINE
-                      begin-frame :NEWLINE
-                      0 argn 0 argn * :NEWLINE
-                      1 argn 1 argn * :NEWLINE
+                    ((defun mag (x y) (+ (* x x) (* y y)))
+                     (":" mag "(" x y ")" :newline
+                      begin-frame :newline
+                      0 argn 0 argn * :newline
+                      1 argn 1 argn * :newline
                       2 overn 3 overn +
-                      frame-return :NEWLINE
+                      frame-return :newline
+		      end-frame :newline
                       ";")
                      "defun with one call")
                     ((defun fn (x) (- 2 (if (> x 3) 3 4)))
                      (":" FN "(" CC X ")" :NEWLINE
                       BEGIN-FRAME :NEWLINE
-                      ARGN> 1 3 > "(" TEST ")" :NEWLINE
-                      TAIL-FRAME :NEWLINE
-                      ARGN> 0 IF :NEWLINE
-                      2 3 - LOOKUP> 1 0 ELSE :NEWLINE
-                      2 4 - LOOKUP> 1 0 THEN :NEWLINE
+                      1 ARGN 3 > "(" TEST ")" :NEWLINE
+                      BEGIN-FRAME :NEWLINE
+                      0 ARGN IF :NEWLINE
+                      2 3 - 0 1 LOOKUP ELSE :NEWLINE
+                      2 4 - 0 1 LOOKUP THEN :NEWLINE
                       FRAME-RETURN :NEWLINE
+		      END-FRAME :newline
+		      END-FRAME :newline
                       ";")
                      "subtraction and comparisons get swapped")
                     ((defun squarer () (lambda (x) (* x x)))
-                     (":" squarer "(" ?ra ")" :newline
+                     (":" squarer "(" ")" :newline
                       begin-frame :newline
-                      "[" begin-frame "(" ?ra1 ?fp x ")":newline
-                      0 argn
-                      2 argn 2 argn *
+                      "[" begin-frame "(" x ")":newline
+                      0 argn 0 argn *
                       frame-return :newline
+		      end-frame :newline
                       "]" current-frame close-lambda :newline
                       frame-return :newline
+		      end-frame :newline
                       ";")
                      "function returning an anonymous function"))
                   :fn #'nolisp:compile-form
@@ -99,14 +92,18 @@ WORLD")
 				    "[" begin-frame "(" x ")" :newline
 				    0 argn 0 argn *
 				    frame-return :newline
+				    end-frame :newline
 				    "]" current-frame close-lambda :newline
 				    frame-return :newline
+				    end-frame :newline
 				    ";")
 		": SQUARER ( X )
 BEGIN-FRAME
 [ BEGIN-FRAME ( X )
 0 ARGN 0 ARGN * FRAME-RETURN
+END-FRAME
 ] CURRENT-FRAME CLOSE-LAMBDA
 FRAME-RETURN
+END-FRAME
 ;"))
 		#'nolisp:to-string))

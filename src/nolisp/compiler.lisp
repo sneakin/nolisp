@@ -4,8 +4,11 @@
 
 (in-package :nolisp)
 
+(defun compile-to-lookup (form)
+  (lookup-resolver (cps-transform (macro-expand form))))
+
 (defun compile-to-list (form)
-  (forthgen (lookup-resolver (cps-transform (macro-expand form)))))
+  (forthgen (compile-to-lookup form)))
 
 (defun compile-form (form)
   (flatten (compile-to-list form)))

@@ -65,19 +65,14 @@
                   (if cl-user::test
                       ,(funcall visitor (third form) state)
                       ,(funcall visitor (fourth form) state)))))
-    (LAMBDA (let ((cc (gensym "CC"))
-                  (fp (gensym "FP")))
-              `(CL:LAMBDA (,cc ,fp ,@(second form))
-                 ,(funcall visitor (if (fourth form)
-                                       (rest (rest form))
-                                       (third form))
-                           cc))))
-    (DEFUN (let ((cc (gensym "CC")))
-             `(CL:DEFUN ,(second form) (,cc ,@(third form))
+    (LAMBDA `(CL:LAMBDA ,(second form)
+			,(funcall visitor (if (fourth form)
+					      (rest (rest form))
+					    (third form)))))
+    (DEFUN `(CL:DEFUN ,(second form) ,(third form)
                 ,(funcall visitor (if (fifth form)
                                       (rest (rest (rest form)))
-                                      (fourth form))
-                          cc))))
+                                      (fourth form)))))
     (t (cps-transform-call form visitor state))))
 
 (defun cps-uncurry (form value)
@@ -89,7 +84,6 @@
 
 (defun cps-transform-lookup (atom state)
   (cond
-    ((null state) atom)
     ((atom state) (list state atom))
     ((eq 'CL-USER::λ (first state)) (cps-uncurry state atom))
     (state (list state atom))
