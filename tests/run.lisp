@@ -31,4 +31,5 @@
   (test-lookup-walker)
   (test-cps-transform)
   (test-compile)
+  (test-to-string)
   t)

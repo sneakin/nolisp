@@ -2,7 +2,7 @@
   `(if ,a
        (progn (format ,stream ".")
               nil)
-       (progn (format ,stream "~&Assertion failed: ~S~%~S~%~S~%" ,msg ',a ,a)
+       (progn (format ,stream "~&Assertion failed: ~A~%~S~%~S~%" ,msg ',a ,a)
               t)))
 
 (defmacro assert-with (fn a b &optional msg)
@@ -21,7 +21,7 @@
 	      (let ((result (funcall fn (first c))))
                 (assert-equal result
                               (second c)
-                              (format nil "~A~%'~A =>~%     ~A~%Not '~A" (third c) (first c) result (second c)))))
+                              (format nil "~A~%~S => ~S~%Not ~S" (third c) (first c) result (second c)))))
           cases))
 
 (defmacro assert-values-equal (expr out-values &optional msg)
