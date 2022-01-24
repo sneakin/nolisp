@@ -1,4 +1,4 @@
-(defun test-compile ()
+(defun test-compile-form ()
   (assert-matches '((ABC (ABC exit-frame) "global symbols pass through")
                     (123 (123 exit-frame) "integers pass through")
                     ("Hello" ("Hello" exit-frame) "strings pass through")
@@ -188,3 +188,23 @@ END-FRAME
 EXIT-FRAME END-FRAME
 ;"))
 		#'nolisp:to-string))
+
+(defun test-compile-to-string ()
+  (let ((*gensym-counter* 1000))
+    (assert-equal (nolisp:compile-to-string '(defun f (x y) (+ (* x x) (* y y))))
+		  ": F ( Y X )
+BEGIN-FRAME
+0 ARGN 0 ARGN *
+INNER-FRAME ( R1000 )
+1 1 LOOKUP 1 1 LOOKUP *
+INNER-FRAME ( R1001 )
+0 ARGN 0 1 LOOKUP + EXIT-FRAME END-FRAME
+END-FRAME
+END-FRAME
+;")))
+
+(defun test-compile ()
+  (test-compile-form)
+  (test-to-string)
+  (test-compile-to-string)
+  t)

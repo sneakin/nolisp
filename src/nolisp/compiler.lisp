@@ -2,6 +2,8 @@
 ;;; Compiler API
 ;;;
 
+;;; todo defmacro to add macros
+
 (in-package :nolisp)
 
 (defun compile-to-lookup (form)
@@ -33,3 +35,6 @@
 (defun to-string (form)
   (with-output-to-string (str)
     (to-string/2 str form)))
+
+(defun compile-to-string (form)
+  (to-string (compile-form form)))

@@ -10,4 +10,4 @@
 	   add-macro remove-macro macro-expand-1 macro-expand
 	   lookup-resolver
 	   cps-transform
-	   compile-to-list compile-form to-string))
+	   compile-to-list compile-form to-string compile-to-string))
