@@ -24,11 +24,11 @@
                                    (RETURN a)
                                    (RETURN b)))))
                     ((if x (boo)) (if x (boo return) (RETURN nil)))
-                    ((who (if (> a b) (boo a) b))
+                    ((who (if (> a b) (boo a) (coo b)))
                      (> a b (λ (TEST)
                                (if TEST
                                    (boo a (λ (:R) (who :R RETURN)))
-                                   (who b RETURN)))))
+                                   (coo b (λ (:R) (who :R RETURN)))))))
                     ((lambda (x y) (if (> x y) x y))
                      (lambda (x y)
                        (> x y (λ (TEST) (if TEST (RETURN x) (RETURN y))))))

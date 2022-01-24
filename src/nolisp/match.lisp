@@ -1,8 +1,13 @@
 (in-package :nolisp)
 
+;; todo change allow-keywords to a predicate function argument w/ (or question-sym? keywordp) as the default
+
+(defun question-sym? (sym)
+  (eq 0 (position #\? (symbol-name sym))))
+
 (defun match-var? (sym &optional (allow-keywords t))
   (if (symbolp sym)
-      (or (eq 0 (position #\? (symbol-name sym)))
+      (or (question-sym? sym)
           (and allow-keywords (keywordp sym)))))
 
 (defun match-atom (pattern atom &key syms (allow-keywords t) (test #'equal))

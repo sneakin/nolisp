@@ -30,6 +30,7 @@
             (forthgen-arg-loaders (rest args)
                                   (cons (first args) ops)
                                   (+ offset 1))
+            ;; appears unreachable with loekups using calls to argn
             (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
               (forthgen-arg-loaders (rest args)
                                     (if (> offset 0)
@@ -45,8 +46,8 @@
              (new-visitor (partial-after visitor new-state))
              (forth-form (funcall new-visitor (first args))))
         (forthgen-funcall visitor new-state fn (rest args)
-                             (if cont (cons forth-form ops) ops)
-                             (if cont cont forth-form)))
+                          (if cont (cons forth-form ops) ops)
+                          (if cont cont forth-form)))
       `(,@ops ,fn ,cont)))
 
 (defun forthgen-list (form visitor state)
@@ -67,10 +68,13 @@
              #'forthgen-lookup
              #'forthgen-list))
 
+;; todo lift the code after the if clause so it's not duplicated in both IF and ELSE.
 (define-forth-form IF (visitor test then else)
   `(,(funcall visitor test) CL-USER::IF :newline
-    ,(funcall visitor then) CL-USER::ELSE :newline
-    ,(funcall visitor else) CL-USER::THEN :newline))
+    ,(funcall visitor then) :newline
+    CL-USER::ELSE :newline
+    ,(funcall visitor else) :newline
+    CL-USER::THEN :newline))
 
 (define-forth-form DEFUN (visitor name args &rest body)
   `(":" ,name "(" ,@(reverse args) ")" :newline
@@ -80,16 +84,15 @@
 
 (define-forth-form λ (visitor args &rest body)
   `(:newline
-    CL-USER::begin-frame "(" ,@args ")" :newline
+    CL-USER::inner-frame "(" ,@args ")" :newline
     ,@(mapcar visitor body)
     CL-USER::end-frame :newline))
 
 (define-forth-form LAMBDA (visitor args &rest body)
   `("[" CL-USER::begin-frame  "(" ,@args ")" :newline
     ,@(mapcar visitor body)
-    CL-USER::frame-return :newline
     CL-USER::end-frame :newline
-    "]" CL-USER::close-lambda))
+    "]" CL-USER::current-frame CL-USER::close-lambda))
 
 (define-forth-form PROGN (visitor &rest calls)
   (mapcar visitor calls))
@@ -113,4 +116,4 @@
 (mapcar (compose
 	 #'(lambda (op) (intern (symbol-name op) :cl-user))
 	 #'(lambda (op) (update-forth-form op (forthgen-arg-reverser op))))
-	'(+ - * / < <= >= > ^ **))
+	'(- / < <= >= > ^ **))
