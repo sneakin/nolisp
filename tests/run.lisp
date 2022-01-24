@@ -20,7 +20,7 @@
 
 ;;; Execute the test functions.
 (defun run-tests ()
-  (test-match)
+  (test-matching)
   (test-range)
   (test-fun)
   (test-list)
