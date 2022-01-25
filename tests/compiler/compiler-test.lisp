@@ -152,12 +152,49 @@
                     ((defun squarer () (lambda (x) (* x x)))
                      (":" squarer "(" ")" :newline
                       begin-frame :newline
-                      "[" begin-frame "(" x ")":newline
-                      0 argn 0 argn *
+                      "[" begin-frame "(" x ?cc ")" :newline
+                      1 argn 1 argn *
                       exit-frame end-frame :newline
-                      "]" current-frame close-lambda end-frame :newline
+                      "]" close-lambda exit-frame end-frame :newline
                       ";")
-                     "function returning an anonymous function"))
+                     "function returning an anonymous function")
+		    ((defun f (x) (lambda (a) (+ x y a)))
+		     (":" f "(" x ")" :newline
+		      begin-frame :newline
+		      "[" begin-frame "(" a ?cc ")" :newline
+		      1 argn y 0 0 closure-lookup + exit-frame end-frame :newline
+		      "]" close-lambda exit-frame end-frame :newline
+		      ";")
+		     "lambda with variable from caller")
+		    ((mapcar (lambda (i) (* i i)) lst)
+		     ("[" begin-frame "(" i ?cc ")" :newline
+		      1 argn 1 argn * exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?R ")" :newline
+		      lst 0 argn mapcar exit-frame end-frame :newline)
+		     "lambda as an argument")
+		    (((lambda (x) (who x)) 3 4 5)
+		     ("[" begin-frame "(" x ?cc ")" :newline
+		      1 argn who exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?RL ")" :newline
+		      5 4 3 0 argn exec exit-frame end-frame :newline)
+		     "lambda in first position")
+		    ((let ((x (+ 2 3))
+			   (y (* 2 2)))
+		       (+ x y))
+		     ("[" begin-frame "(" y x ?CC ")" :newline
+		      2 argn 1 argn + exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?RL ")" :newline
+		      3 2 + :newline
+		      inner-frame "(" ?RX ")" :newline
+		      2 2 * :newline
+		      inner-frame "(" ?RY ")" :newline
+		      0 argn 0 1 lookup 0 2 lookup funcall exit-frame end-frame :newline
+		      end-frame :newline
+		      end-frame :newline)
+		     "let forms"))
                   :fn #'nolisp:compile-form
                   :allow-keywords nil
 		  ))

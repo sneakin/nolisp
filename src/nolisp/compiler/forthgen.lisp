@@ -30,7 +30,7 @@
             (forthgen-arg-loaders (rest args)
                                   (cons (first args) ops)
                                   (+ offset 1))
-            ;; appears unreachable with loekups using calls to argn
+            ;; appears unreachable with lookups using calls to argn
             (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
               (forthgen-arg-loaders (rest args)
                                     (if (> offset 0)
@@ -56,7 +56,10 @@
          (macro (assoc name *forth-forms*)))
     (if macro
         (apply (cdr macro) (cons visitor args))
-        (forthgen-funcall visitor state name (shift-right args)))))
+      (if (atom name)
+	  (forthgen-funcall visitor state name (shift-right args))
+	(forthgen-funcall visitor state 'CL-USER::exec
+			  (shift-right (cons name args)))))))
 
 (defun forthgen-lookup (sym state)
   (cond
@@ -89,10 +92,12 @@
     CL-USER::end-frame :newline))
 
 (define-forth-form LAMBDA (visitor args &rest body)
-  `("[" CL-USER::begin-frame  "(" ,@args ")" :newline
-    ,@(mapcar visitor body)
-    CL-USER::end-frame :newline
-    "]" CL-USER::current-frame CL-USER::close-lambda))
+  (multiple-value-bind (body cc) (clip-last body)
+    `("[" CL-USER::begin-frame  "(" ,@(reverse args) ")" :newline
+      ,@(mapcar visitor body)
+      CL-USER::end-frame :newline
+      "]" CL-USER::close-lambda
+      ,@(funcall visitor cc))))
 
 (define-forth-form PROGN (visitor &rest calls)
   (mapcar visitor calls))
@@ -106,6 +111,9 @@
 
 (define-forth-form LOOKUP (visitor depth n)
   `(,n ,depth CL-USER::LOOKUP))
+
+(define-forth-form CLOSURE-LOOKUP (visitor depth n)
+  `(,n ,depth CL-USER::CLOSURE-LOOKUP))
 
 (defun forthgen-arg-reverser (op)
   #'(lambda (visitor &rest args)

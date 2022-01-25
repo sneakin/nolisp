@@ -48,7 +48,8 @@
         form
         (macro-expand new-form))))
 
-(update-macro 'LET #'(lambda (bindings &rest body)
-                          `(funcall (lambda ,(mapcar #'first bindings)
-                                      ,@body)
-                                    ,@(mapcar #'second bindings))))
+(update-macro 'CL-USER::LET
+	      #'(lambda (bindings &rest body)
+                  `(funcall (lambda ,(mapcar #'first bindings)
+                              ,@body)
+                            ,@(mapcar #'second bindings))))

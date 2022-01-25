@@ -35,4 +35,13 @@
                 '(+ (+ 3 4) (+ (+ 4 5) 7)))
   (assert-equal (nolisp:macro-expand '(woo 3)) '(+ 3 3))
   (assert-equal (nolisp:macro-expand '(woo (woo 3))) '(+ (+ 3 3) (+ 3 3)))
+  (assert-equal (nolisp:macro-expand '(let ((x (+ 2 3))
+					    (y (* 4 2)))
+					(+ x y)))
+		'(funcall (lambda (x y) (+ x y)) (+ 2 3) (* 4 2)))
+  ;; needs to handle earlier references
+  ;; (assert-equal (nolisp:macro-expand '(let ((x (+ 2 3))
+  ;; 					    (y (* x 2)))
+  ;; 					(+ x y)))
+  ;; 		'(funcall (lambda (x y) (+ x y)) (+ 2 3) (* x 2)))
   (teardown-test))
