@@ -4,6 +4,12 @@
                     ("Hello" ("Hello" exit-frame) "strings pass through")
                     ((+ 2 3 4) (4 3 2 + exit-frame) "math function call")
                     ((f 2 3 4) (4 3 2 f exit-frame) "named function call")
+		    ((> x y) (x y > exit-frame) "reverses args to >")
+		    ((>= x y) (x y >= exit-frame) "reverses args to >=")
+		    ((< x y) (x y < exit-frame) "reverses args to <")
+		    ((<= x y) (x y <= exit-frame) "reverses args to <=")
+		    ((- x y) (x y - exit-frame) "reverses args to <=")
+		    ((/ x y) (x y / exit-frame) "reverses args to /")
                     ;;((f (g)) (g f exit-frame) "simple nested function call")
                     ((f (g))
 		     (g :newline
@@ -87,6 +93,27 @@
 			inner-frame "(" ?R ")" :newline
 			1 0 argn 4 exit-frame end-frame :newline)
 		     "progn executes each arg, returns the last")
+		    ((if x (+ 2 3))
+		     (x IF :newline
+			3 2 + exit-frame :newline
+			ELSE :newline
+			nil exit-frame :newline
+			THEN :newline)
+		     "IF w/ no else")
+		    ((if x (+ 2 3) nil)
+		     (x IF :newline
+			3 2 + exit-frame :newline
+			ELSE :newline
+			nil exit-frame :newline
+			THEN :newline)
+		     "IF w/ else returning nil")
+		    ((if x nil (+ 2 3))
+		     (x IF :newline
+			nil exit-frame :newline
+			ELSE :newline
+			3 2 + exit-frame :newline
+			THEN :newline)
+		     "IF w/ true clause returning nil")
 		    ((if (> x y) x y)
 		     ;;(x y > IF x ELSE y THEN)
 		     (x y > :newline
@@ -100,14 +127,19 @@
 		     "top level if")
 		    ((f (if (> x y) x y))
 		     ;;(x y > IF x f ELSE y f THEN)
-		     (x y > :newline
-			inner-frame "(" TEST ")" :newline
-			0 argn IF :newline
-			x f exit-frame :newline
-			ELSE :newline
-			y f exit-frame :newline
-			THEN :newline
-			end-frame :newline)
+		     ("[" begin-frame "(" ?R ?CC ")" :newline
+		      1 argn f exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?CL ")" :newline
+		      x y > :newline
+		      inner-frame "(" TEST ")" :newline
+		      0 argn IF :newline
+		      x 0 1 lookup exec exit-frame :newline
+		      ELSE :newline
+		      y 0 1 lookup exec exit-frame :newline
+		      THEN :newline
+		      end-frame :newline
+		      end-frame :newline)
 		     "if as an arg")
                     ((defun fn () 123)
                      (":" fn "(" ")" :newline
@@ -138,15 +170,20 @@
                     ((defun fn (x) (- 2 (if (> x 3) 3 4)))
                      (":" FN "(" X ")" :NEWLINE
                       BEGIN-FRAME :NEWLINE
-                      0 ARGN 3 > :NEWLINE
+		      "[" BEGIN-FRAME "(" ?R ?CC ")" :NEWLINE
+		      2 1 ARGN - EXIT-FRAME END-FRAME :NEWLINE
+		      "]" CLOSE-LAMBDA :NEWLINE
+		      INNER-FRAME "(" ?CL ")" :NEWLINE
+                      0 1 LOOKUP 3 > :NEWLINE
                       INNER-FRAME "(" TEST ")" :NEWLINE
                       0 ARGN IF :NEWLINE
-                      2 3 - EXIT-FRAME :NEWLINE
+                      3 0 1 LOOKUP EXEC EXIT-FRAME :NEWLINE
 		      ELSE :NEWLINE
-                      2 4 - EXIT-FRAME :NEWLINE
+                      4 0 1 LOOKUP EXEC EXIT-FRAME :NEWLINE
 		      THEN :NEWLINE
-                      END-FRAME :newline
-		      END-FRAME :newline
+                      END-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
                       ";")
                      "subtraction and comparisons get swapped")
                     ((defun squarer () (lambda (x) (* x x)))
@@ -166,6 +203,44 @@
 		      "]" close-lambda exit-frame end-frame :newline
 		      ";")
 		     "lambda with variable from caller")
+		    ((defun f (a) (+ 2 a (if (> a 0) a (negate a))))
+		     (":" f "(" a ")" :newline
+		      begin-frame :newline
+		      "[" begin-frame "(" ?R ?CC ")" :newline
+		      1 argn 0 0 closure-lookup 2 + exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?CL ")" :newline
+		      0 1 lookup 0 > :newline
+		      inner-frame "(" TEST ")" :newline
+		      0 argn IF :newline
+		      0 2 lookup 0 1 lookup exec exit-frame :newline
+		      ELSE :newline
+		      0 2 lookup negate 0 1 lookup exec exit-frame :newline
+		      THEN :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      ";")
+		     "if with variables from a function")
+		    ((defun f (a) (+ 2 a (if (> a 0) (* a 2) (* a -2))))
+		     (":" f "(" a ")" :newline
+		      begin-frame :newline
+		      "[" begin-frame "(" ?R ?CC ")" :newline
+		      1 argn 0 0 closure-lookup 2 + exit-frame end-frame :newline
+		      "]" close-lambda :newline
+		      inner-frame "(" ?CL ")" :newline
+		      0 1 lookup 0 > :newline
+		      inner-frame "(" TEST ")" :newline
+		      0 argn IF :newline
+		      2 0 2 lookup * 0 1 lookup exec exit-frame :newline
+		      ELSE :newline
+		      -2 0 2 lookup * 0 1 lookup exec exit-frame :newline
+		      THEN :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      ";")
+		     "if with variables as argumonts from a function")
 		    ((mapcar (lambda (i) (* i i)) lst)
 		     ("[" begin-frame "(" i ?cc ")" :newline
 		      1 argn 1 argn * exit-frame end-frame :newline

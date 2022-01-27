@@ -16,6 +16,7 @@
 			   (allow-keywords t)
 			   (varp (partial-after #'nolisp::match-var? allow-keywords)))
   (assert-anymatch input pattern
+		   :msg msg
 		   :allow-keywords allow-keywords
 		   :varp varp))
 

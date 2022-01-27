@@ -23,7 +23,8 @@
 (defun lookup-form? (form)
   (and (listp form)
        (or (eq 'CL-USER::ARGN (first form))
-           (eq 'CL-USER::LOOKUP (first form)))))
+           (eq 'CL-USER::LOOKUP (first form))
+	   (eq 'CL-USER::CLOSURE-LOOKUP (first form)))))
 
 (defun lookup-resolver-atom (form state &optional (depth 0))
   (multiple-value-bind (index depth)
@@ -42,7 +43,8 @@
   (if args
       (lookup-resolver-call visitor state
                             (rest args)
-                            (cons (funcall (partial-after visitor state) (first args)) ops))
+                            (cons (funcall (partial-after visitor state) (first args))
+				  ops))
       (nreverse ops)))
 
 (defun lookup-resolver-list (form visitor state)
@@ -51,12 +53,15 @@
      (let ((args (second form))
 	   (closure (gensym "CC"))
 	   (body (rest (rest form))))
-       `(CL-USER::LAMBDA (,closure ,@args)
-			 ,@(mapcar (partial-after visitor
-						  (make-frame (cons closure args)
-							      nil
-							      state))
-				   body))))
+       (multiple-value-bind
+	(body cont) (clip-last body)
+	`(CL-USER::LAMBDA (,closure ,@args)
+			  ,@(mapcar (partial-after visitor
+						   (make-frame (cons closure args)
+							       nil
+							       state))
+				    body)
+			  ,(funcall visitor cont state)))))
     (CL-USER::λ
      (let ((args (second form))
 	   (body (rest (rest form))))

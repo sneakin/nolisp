@@ -23,6 +23,7 @@
   `(update-forth-form ',(intern (symbol-name name) :cl-user)
 		      #'(lambda ,arglist ,@body)))
 
+;; never called
 (defun forthgen-arg-loaders (args &optional ops (offset 0))
   (if args
       (let ((item (first args)))
@@ -31,7 +32,7 @@
                                   (cons (first args) ops)
                                   (+ offset 1))
             ;; appears unreachable with lookups using calls to argn
-            (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
+          (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
               (forthgen-arg-loaders (rest args)
                                     (if (> offset 0)
                                         (cons `(,offset overn) ops)
@@ -40,6 +41,17 @@
       
       (nreverse ops)))
 
+(defun forthgen-lookup? (form)
+  (or (eq 'CL-USER::LOOKUP form)
+      (eq 'CL-USER::ARGV form)
+      (eq 'CL-USER::CLOSURE-LOOKUP form)))
+
+(defun forthgen-emit-cc (form)
+  (if (and (listp form)
+	   (forthgen-lookup? (first (last form))))
+      (list form 'CL-USER::EXEC 'CL-USER::EXIT-FRAME)
+    form))
+
 (defun forthgen-funcall (visitor state fn args &optional ops cont)
   (if args
       (let* ((new-state state)
@@ -47,37 +59,37 @@
              (forth-form (funcall new-visitor (first args))))
         (forthgen-funcall visitor new-state fn (rest args)
                           (if cont (cons forth-form ops) ops)
-                          (if cont cont forth-form)))
-      `(,@ops ,fn ,cont)))
+                          (if cont cont (forthgen-emit-cc forth-form))))
+    `(,@ops ,fn ,cont)))
 
 (defun forthgen-list (form visitor state)
   (let* ((name (first form))
          (args (rest form))
          (macro (assoc name *forth-forms*)))
-    (if macro
-        (apply (cdr macro) (cons visitor args))
-      (if (atom name)
-	  (forthgen-funcall visitor state name (shift-right args))
-	(forthgen-funcall visitor state 'CL-USER::exec
-			  (shift-right (cons name args)))))))
+    (cond
+     (macro
+      (apply (cdr macro) (cons visitor args)))
+     ((listp name)
+      (forthgen-funcall visitor state 'CL-USER::exec (shift-right (cons name args))))
+     (t (forthgen-funcall visitor state name (shift-right args))))))
 
-(defun forthgen-lookup (sym state)
+(defun forthgen-atom (sym state)
   (cond
    ((eq sym 'CL-USER::return) 'CL-USER::exit-frame)
    (t (identity sym))))
 
 (defun forthgen (form)
   (scan-list form
-             #'forthgen-lookup
+             #'forthgen-atom
              #'forthgen-list))
 
-;; todo lift the code after the if clause so it's not duplicated in both IF and ELSE.
 (define-forth-form IF (visitor test then else)
-  `(,(funcall visitor test) CL-USER::IF :newline
-    ,(funcall visitor then) :newline
-    CL-USER::ELSE :newline
-    ,(funcall visitor else) :newline
-    CL-USER::THEN :newline))
+  (list (funcall visitor test)
+	'CL-USER::IF :newline
+	(funcall visitor then) :newline
+	'CL-USER::ELSE :newline
+	(funcall visitor else) :newline
+	'CL-USER::THEN :newline))
 
 (define-forth-form DEFUN (visitor name args &rest body)
   `(":" ,name "(" ,@(reverse args) ")" :newline
@@ -124,4 +136,4 @@
 (mapcar (compose
 	 #'(lambda (op) (intern (symbol-name op) :cl-user))
 	 #'(lambda (op) (update-forth-form op (forthgen-arg-reverser op))))
-	'(- / < <= >= > ^ **))
+	'(- / < <= >= >))

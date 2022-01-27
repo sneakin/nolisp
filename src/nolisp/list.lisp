@@ -8,10 +8,14 @@
   (if lst
       (if (atom lst)
           (cons lst result)
-          (flatten (rest lst) (flatten (first lst) result nil) top))
-      (if top
-          (nreverse result)
-          result)))
+        (flatten (rest lst)
+		 (if (first lst)
+		     (flatten (first lst) result nil)
+		   (cons (first lst) result))
+		 top))
+    (if top
+        (nreverse result)
+      result)))
 
 (defun clip-last (lst)
   (let ((rl (reverse lst)))

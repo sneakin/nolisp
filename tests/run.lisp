@@ -28,7 +28,7 @@
   (test-scan-list)
   (test-macro-expand-1)
   (test-macro-expand)
-  (test-lookup-walker)
   (test-cps-transform)
+  (test-lookup-walker)
   (test-compile)
   t)
