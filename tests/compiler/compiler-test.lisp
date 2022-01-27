@@ -270,40 +270,12 @@
 		      end-frame :newline
 		      end-frame :newline)
 		     "let forms"))
-                  :fn #'nolisp:compile-form
-                  :allow-keywords nil
-		  ))
+                  :fn (partial-after #'nolisp:compile-to-forth 'flatten)
+                  :allow-keywords nil))
 
-(defun test-to-string ()
-  (assert-cases '(((hello world) "HELLO WORLD")
-		  ((hello nil world nil) "HELLO NIL WORLD NIL")
-		  ((hello :call world :var) "HELLO WORLD")
-		  ((:var hello :call world) "HELLO WORLD")
-		  ((hello :call world :var 123) "HELLO WORLD 123")
-		  ((hello :newline world) "HELLO
-WORLD")
-		  ((":" squarer "(" x ")" :newline
-				    begin-frame :newline
-				    "[" begin-frame "(" x ")" :newline
-				    0 argn 0 argn *
-				    exit-frame :newline
-				    end-frame :newline
-				    "]" current-frame close-lambda :newline
-				    exit-frame end-frame :newline
-				    ";")
-		": SQUARER ( X )
-BEGIN-FRAME
-[ BEGIN-FRAME ( X )
-0 ARGN 0 ARGN * EXIT-FRAME
-END-FRAME
-] CURRENT-FRAME CLOSE-LAMBDA
-EXIT-FRAME END-FRAME
-;"))
-		#'nolisp:to-string))
-
-(defun test-compile-to-string ()
+(defun test-compile-to-forth ()
   (let ((*gensym-counter* 1000))
-    (assert-equal (nolisp:compile-to-string '(defun f (x y) (+ (* x x) (* y y))))
+    (assert-equal (nolisp:compile-to-forth '(defun f (x y) (+ (* x x) (* y y))))
 		  ": F ( Y X )
 BEGIN-FRAME
 0 ARGN 0 ARGN *
@@ -318,5 +290,5 @@ END-FRAME
 (defun test-compile ()
   (test-compile-form)
   (test-to-string)
-  (test-compile-to-string)
+  (test-compile-to-forth)
   t)

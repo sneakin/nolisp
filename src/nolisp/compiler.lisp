@@ -6,35 +6,35 @@
 
 (in-package :nolisp)
 
+(defvar *stages* `((macro-expand . ,#'macro-expand)
+		   (cps-transform . ,#'cps-transform)
+		   (lookup-resolver . ,#'lookup-resolver)
+		   (forthgen . ,#'forthgen)
+		   (flatten . ,#'flatten)
+		   (to-string . ,#'to-string)))
+
+(defun compile-to-forth (form &optional to-stage (stages *stages*) last-stage)
+  (if (numberp to-stage)
+      (compile-to-forth form (car (nth to-stage stages)) stages)
+    (if (and stages (not (and last-stage (eq to-stage last-stage))))
+	(compile-to-forth (funcall (cdr (first stages)) form)
+			  to-stage
+			  (rest stages)
+			  (first (first stages)))
+      form)))
+
+;;;
+;;; Helper ~compile-to-forth~ wrappers:
+;;;
+
 (defun compile-to-lookup (form)
-  (lookup-resolver (cps-transform (macro-expand form))))
+  (compile-to-forth form 'lookup-resolver))
 
 (defun compile-to-list (form)
-  (forthgen (compile-to-lookup form)))
+  (compile-to-forth form 'forthgen))
 
-(defun compile-form (form)
-  (flatten (compile-to-list form)))
-
-(defun to-string-keyword? (sym)
-  (if sym (not (not (position sym '(:newline :var :call))))))
-
-(defun to-string/2 (stream form &optional (was-key t))
-  (when form
-    (let ((arg (first form)))
-      (cond
-       ((eq arg :newline)
-	(princ #\newline stream)
-	(to-string/2 stream (rest form) t))
-       ((to-string-keyword? arg)
-	(to-string/2 stream (rest form) was-key))
-       (t
-	(unless was-key (princ #\space stream))
-	(princ arg stream)
-	(to-string/2 stream (rest form) nil))))))
-
-(defun to-string (form)
-  (with-output-to-string (str)
-    (to-string/2 str form)))
+(defun compile-to-flatlist (form)
+  (compile-to-forth form 'flatten))
 
 (defun compile-to-string (form)
-  (to-string (compile-form form)))
+  (compile-to-forth form 'to-string))

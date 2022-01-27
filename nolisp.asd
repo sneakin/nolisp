@@ -19,6 +19,7 @@
     (:file "compiler/cps-transform" :depends-on ("package" "error" "scanner"))
     (:file "compiler/lookup-resolver" :depends-on ("package" "fun"))
     (:file "compiler/forthgen" :depends-on ("package" "scanner" "list" "fun"))
+    (:file "compiler/to-string" :depends-on ("package"))
     (:file "compiler"
 	   :depends-on ("package"
 			"compiler/errors"

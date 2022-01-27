@@ -10,4 +10,5 @@
 	   add-macro remove-macro macro-expand-1 macro-expand
 	   lookup-resolver
 	   cps-transform
-	   compile-to-list compile-form to-string compile-to-string))
+	   *stages* compile-to-forth
+	   compile-to-lookup compile-to-list compile-to-flatlist to-string compile-to-string))
