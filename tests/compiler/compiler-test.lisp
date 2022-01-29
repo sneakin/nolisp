@@ -266,7 +266,7 @@
 		      inner-frame "(" ?RX ")" :newline
 		      2 2 * :newline
 		      inner-frame "(" ?RY ")" :newline
-		      0 argn 0 1 lookup 0 2 lookup funcall exit-frame end-frame :newline
+		      0 argn 0 1 lookup 0 2 lookup exec exit-frame end-frame :newline
 		      end-frame :newline
 		      end-frame :newline)
 		     "let forms"))

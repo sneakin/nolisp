@@ -22,12 +22,9 @@
   (remove-macro name)
   (add-macro name fn))
 
-(defun gen-macro-caller (args body)
-  (eval `(lambda ,args ,@body)))
-
-(defun define-macro (form env)
-  (update-macro (first form) (gen-macro-caller (second form) (rest (rest form))))
-  nil)
+(defmacro define-macro (name arglist &rest body)
+  `(update-macro ',(intern (symbol-name name) :cl-user)
+		 #'(lambda ,arglist ,@body)))
 
 (defun call-macro (form visitor state)
   (let* ((name (first form))
@@ -48,8 +45,7 @@
         form
         (macro-expand new-form))))
 
-(update-macro 'CL-USER::LET
-	      #'(lambda (bindings &rest body)
-                  `(funcall (lambda ,(mapcar #'first bindings)
-                              ,@body)
-                            ,@(mapcar #'second bindings))))
+(define-macro LET (bindings &rest body)
+  `((lambda ,(mapcar #'first bindings)
+              ,@body)
+            ,@(mapcar #'second bindings)))

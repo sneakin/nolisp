@@ -38,7 +38,7 @@
   (assert-equal (nolisp:macro-expand '(let ((x (+ 2 3))
 					    (y (* 4 2)))
 					(+ x y)))
-		'(funcall (lambda (x y) (+ x y)) (+ 2 3) (* 4 2)))
+		'((lambda (x y) (+ x y)) (+ 2 3) (* 4 2)))
   ;; needs to handle earlier references
   ;; (assert-equal (nolisp:macro-expand '(let ((x (+ 2 3))
   ;; 					    (y (* x 2)))
