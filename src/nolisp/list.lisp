@@ -31,3 +31,19 @@
 
 (defun shift-right (lst)
   (nreverse (nolisp:shift-left (reverse lst))))
+
+(defun reduce-values (fn lst &key key from-end (start 0) end initial-value)
+  (if (and initial-value (atom initial-value))
+      (reduce #'(lambda (acc i) (funcall fn i acc))
+	      lst
+	      :key key :from-end from-end :start start :end end
+	      :initial-value initial-value)
+    (values-list
+     (reduce (if from-end
+		 #'(lambda (i acc)
+		     (multiple-value-list (apply fn (cons i acc))))
+	       #'(lambda (acc i)
+		   (multiple-value-list (apply fn (cons i acc)))))
+	     lst
+	     :key key :from-end from-end :start start :end end
+	     :initial-value initial-value))))
