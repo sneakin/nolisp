@@ -7,7 +7,7 @@
 	   frange range
 	   scanner-error scan-list scan-list-reducer-fn scan-list-reducer
 	   error-msg error-form error-state error
-	   add-macro remove-macro macro-expand-1 macro-expand
+	   *macros* macro? add-macro remove-macro macro-expand-1 macro-expand
 	   lookup-resolver
 	   cps-transform
 	   *stages* compile-to-forth
