@@ -7,14 +7,17 @@
 
 (defmacro assert-with (fn a b &optional msg)
   `(let ((ar ,a))
-     (nassert (,fn ar ,b)
+     (nassert (funcall ,fn ar ,b)
 	      ,(if msg msg `(format nil "~S => ~S not ~S ~S" ',a ar ',fn ',b)))))
 
 (defmacro assert-eq (a b &optional msg)
-  `(assert-with eq ,a ,b ,msg))
+  `(assert-with #'eq ,a ,b ,msg))
 
 (defmacro assert-equal (a b &optional msg)
-  `(assert-with equal ,a ,b ,msg))
+  `(assert-with #'equal ,a ,b ,msg))
+
+(defmacro assert-not-equal (a b &optional msg)
+  `(assert-with (compose #'equal #'not) ,a ,b ,msg))
 
 (defun assert-cases (cases fn)
   (mapcar #'(lambda (c)
