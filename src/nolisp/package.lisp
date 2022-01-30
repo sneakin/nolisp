@@ -5,7 +5,7 @@
 	   match
 	   lerp
 	   frange range
-	   scanner-error scan-list
+	   scanner-error scan-list scan-list-reducer-fn scan-list-reducer
 	   error-msg error-form error-state error
 	   add-macro remove-macro macro-expand-1 macro-expand
 	   lookup-resolver
