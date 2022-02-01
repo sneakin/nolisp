@@ -1,7 +1,7 @@
 (in-package :nolisp)
 
 (defun to-string-keyword? (sym)
-  (if sym (not (not (position sym '(:newline :var :call))))))
+  (if sym (not (not (position sym '(:newline :var :call :nonexit))))))
 
 (defun to-string/2 (stream form &optional (was-key t))
   (when form

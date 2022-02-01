@@ -4,6 +4,29 @@
 
 (in-package :nolisp)
 
+;;;
+;;; State tracking and Forth code accumulator:
+;;;
+
+(defun make-forthgen-state (&optional code (depth 0))
+  (list code depth))
+(defun forthgen-state-code (state) (first state))
+(defun forthgen-state-depth (state) (second state))
+
+(defun forthgen-state-new-code (state code)
+  (make-forthgen-state code
+		       (forthgen-state-depth state)))
+
+(defun forthgen-state-zero-depth (state)
+  (make-forthgen-state (forthgen-state-code state) 0))
+(defun forthgen-state-inc-depth (state &optional (amount 1))
+  (make-forthgen-state (forthgen-state-code state)
+		       (+ amount (forthgen-state-depth state))))
+
+;;;
+;;; Translated Form list
+;;;
+
 (defvar *forth-forms* '())
 
 (defun add-forth-form (name fn)
@@ -23,23 +46,26 @@
   `(update-forth-form ',(intern (symbol-name name) :cl-user)
 		      #'(lambda ,arglist ,@body)))
 
-;; never called
-(defun forthgen-arg-loaders (args &optional ops (offset 0))
-  (if args
-      (let ((item (first args)))
-        (if (atom item)
-            (forthgen-arg-loaders (rest args)
-                                  (cons (first args) ops)
-                                  (+ offset 1))
-            ;; appears unreachable with lookups using calls to argn
-          (let* ((new-offset (+ offset 1 (if (atom item) 1 (length item)))))
-              (forthgen-arg-loaders (rest args)
-                                    (if (> offset 0)
-                                        (cons `(,offset overn) ops)
-                                      ops)
-                                    new-offset))))
-      
-      (nreverse ops)))
+;;;
+;;; scan-list visitor state updaters:
+;;;
+
+(defun forthgen-update-visitor (visitor new-state)
+  #'(lambda (i) (funcall visitor i new-state)))
+
+(defun forthgen-deeper-visitor (visitor state)
+  (forthgen-update-visitor visitor (forthgen-state-inc-depth state)))
+
+(defun forthgen-top-visitor (visitor state)
+  (forthgen-update-visitor visitor (forthgen-state-zero-depth state)))
+
+(defun forthgen-deeper-code-visitor (visitor state)
+  (compose (forthgen-deeper-visitor visitor state)
+	   #'forthgen-state-code))
+
+;;;
+;;; Form traversal
+;;;
 
 (defun forthgen-lookup? (form)
   (or (eq 'CL-USER::LOOKUP form)
@@ -55,8 +81,8 @@
 (defun forthgen-funcall (visitor state fn args &optional ops cont)
   (if args
       (let* ((new-state state)
-             (new-visitor (partial-after visitor new-state))
-             (forth-form (funcall new-visitor (first args))))
+             (newer-state (funcall visitor (first args) new-state))
+	     (forth-form (forthgen-state-code newer-state)))
         (forthgen-funcall visitor new-state fn (rest args)
                           (if cont (cons forth-form ops) ops)
                           (if cont cont (forthgen-emit-cc forth-form))))
@@ -66,72 +92,99 @@
   (let* ((name (first form))
          (args (rest form))
          (macro (assoc name *forth-forms*)))
-    (cond
-     (macro
-      (apply (cdr macro) (cons visitor args)))
-     ((listp name)
-      (forthgen-funcall visitor state 'CL-USER::exec (shift-right (cons name args))))
-     (t (forthgen-funcall visitor state name (shift-right args))))))
+    (forthgen-state-new-code
+     state
+     (cond
+      (macro
+       (apply (cdr macro) (cons visitor (cons state args))))
+      ((listp name)
+	(forthgen-funcall visitor state
+			  'CL-USER::exec (shift-right (cons name args))))
+      (t (forthgen-funcall visitor state
+			   name (shift-right args)))))))
 
 (defun forthgen-atom (sym state)
-  (cond
-   ((eq sym 'CL-USER::return) 'CL-USER::exit-frame)
-   (t (identity sym))))
+  (forthgen-state-new-code
+   state
+   (cond
+    ((eq sym 'CL-USER::return)
+     (if (< 0 (forthgen-state-depth state))
+	 'CL-USER::exit-frame
+       :nonexit))
+    (t (identity sym)))))
+
+(defun forthgen-scan (form)
+  (scan-list form #'forthgen-atom #'forthgen-list (make-forthgen-state)))
 
 (defun forthgen (form)
-  (scan-list form
-             #'forthgen-atom
-             #'forthgen-list))
+  (forthgen-state-code (forthgen-scan form)))
 
-(define-forth-form IF (visitor test then else)
-  (list (funcall visitor test)
+;;;
+;;; Translated forms
+;;;
+
+(define-forth-form IF (visitor state test then else)
+  (list (forthgen-state-code (funcall visitor test))
 	'CL-USER::IF :newline
-	(funcall visitor then) :newline
+	(forthgen-state-code (funcall visitor then)) :newline
 	'CL-USER::ELSE :newline
-	(funcall visitor else) :newline
-	'CL-USER::THEN :newline))
+	(forthgen-state-code (funcall visitor else)) :newline
+	'CL-USER::THEN))
 
-(define-forth-form DEFUN (visitor name args &rest body)
-  `(":" ,name "(" ,@(reverse args) ")" :newline
-    CL-USER::begin-frame :newline
-    ,@(mapcar visitor body)
-    CL-USER::end-frame :newline ";"))
+(define-forth-form DEFUN (visitor state name args &rest body)
+  (let ((inner-visitor (forthgen-deeper-code-visitor visitor state)))
+    `(":" ,name "(" ,@(reverse args) ")" :newline
+      CL-USER::begin-frame :newline
+      ,@(mapcar inner-visitor body) :newline
+      CL-USER::end-frame :newline ";")))
 
-(define-forth-form λ (visitor args &rest body)
-  `(:newline
-    CL-USER::inner-frame "(" ,@args ")" :newline
-    ,@(mapcar visitor body)
-    CL-USER::end-frame :newline))
+(define-forth-form λ (visitor state args &rest body)
+  (let ((inner-visitor (forthgen-deeper-code-visitor visitor state)))
+    `(:newline
+      CL-USER::inner-frame "(" ,@args ")" :newline
+      ,@(mapcar inner-visitor body) :newline
+      CL-USER::end-frame)))
 
-(define-forth-form LAMBDA (visitor args &rest body)
-  (multiple-value-bind (body cc) (clip-last body)
-    `("[" CL-USER::begin-frame  "(" ,@(reverse args) ")" :newline
-      ,@(mapcar visitor body)
-      CL-USER::end-frame :newline
-      "]" CL-USER::close-lambda
-      ,@(funcall visitor cc))))
+(define-forth-form LAMBDA (visitor state args &rest body)
+  (let ((inner-visitor (compose (forthgen-top-visitor visitor state)
+				#'forthgen-state-code)))
+    (multiple-value-bind
+     (body cc) (clip-last body)
+     `("[" CL-USER::begin-frame  "(" ,@(reverse args) ")" :newline
+       ,@(mapcar inner-visitor body)
+       CL-USER::end-frame :newline
+       "]" CL-USER::close-lambda
+       ,@(forthgen-state-code (funcall visitor cc))))))
 
-(define-forth-form PROGN (visitor &rest calls)
-  (mapcar visitor calls))
+(define-forth-form PROGN (visitor state &rest calls)
+  (mapcar (compose visitor #'forthgen-state-code)
+	  calls))
 
-(define-forth-form RETURN (visitor arg)
-  (list (funcall visitor arg)
-	'CL-USER::exit-frame))
+(define-forth-form RETURN (visitor state arg)
+  (let ((code (forthgen-state-code (funcall visitor arg))))
+    (if (< 0 (forthgen-state-depth state))
+	(list code 'CL-USER::exit-frame)
+      code)))
 
-(define-forth-form ARGN (visitor n)
+(define-forth-form ARGN (visitor state n)
   `(,n CL-USER::ARGN))
 
-(define-forth-form LOOKUP (visitor depth n)
+(define-forth-form LOOKUP (visitor state depth n)
   `(,n ,depth CL-USER::LOOKUP))
 
-(define-forth-form CLOSURE-LOOKUP (visitor depth n)
+(define-forth-form CLOSURE-LOOKUP (visitor state depth n)
   `(,n ,depth CL-USER::CLOSURE-LOOKUP))
 
+;;;
+;;; Forms where arguments need reversing.
+;;;
+
 (defun forthgen-arg-reverser (op)
-  #'(lambda (visitor &rest args)
-      (multiple-value-bind (lst last-item)
-          (clip-last args)
-        (mapcar visitor (append lst (list op last-item))))))
+  #'(lambda (visitor state &rest args)
+      (multiple-value-bind
+       (lst last-item) (clip-last args)
+       (mapcar (compose visitor #'forthgen-state-code)
+	       (append lst (list op last-item))))))
 
 (mapcar (compose
 	 #'(lambda (op) (intern (symbol-name op) :cl-user))
