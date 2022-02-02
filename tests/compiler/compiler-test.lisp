@@ -218,6 +218,12 @@
 		      END-FRAME :NEWLINE
                       ";")
                      "subtraction and comparisons get swapped")
+                    ((lambda (x) (* x x))
+                     ("[" begin-frame "(" x ?cc ")" :newline
+                      1 argn 1 argn *
+                      :nonexit end-frame :newline
+                      "]" close-lambda :nonexit)
+                     "an anonymous function")
                     ((defun squarer () (lambda (x) (* x x)))
                      (":" squarer "(" ")" :newline
                       begin-frame :newline

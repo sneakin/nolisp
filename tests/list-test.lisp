@@ -4,7 +4,9 @@
   (assert-equal (nolisp:flatten '(1 (2 (3)))) '(1 2 3))
   (assert-equal (nolisp:flatten '(1 (2 (3) 4))) '(1 2 3 4))
   (assert-equal (nolisp:flatten '(a nil b)) '(a nil b))
-  (assert-equal (nolisp:flatten '(1 (a nil b) 2)) '(1 a nil b 2)))
+  (assert-equal (nolisp:flatten '(1 (a nil b) 2)) '(1 a nil b 2))
+  (assert-equal (nolisp:flatten '(1 . 2)) '(1 2))
+  (assert-equal (nolisp:flatten '(1 2 . 3)) '(1 2 3)))
 
 (defun test-clip-last ()
   (assert-values-equal (nolisp:clip-last '(1)) '(() 1))
@@ -67,8 +69,8 @@
 			 :start 2
 			 :end 4
 			 :initial-value '(0 0 1))
-      '(7 -7 12)
-      "supports reduce's keywords"))
+   '(7 -7 12)
+   "supports reduce's keywords"))
 
 (defun test-list ()
   (test-flatten)

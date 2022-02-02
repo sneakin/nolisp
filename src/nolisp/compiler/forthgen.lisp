@@ -154,7 +154,7 @@
        ,@(mapcar inner-visitor body)
        CL-USER::end-frame :newline
        "]" CL-USER::close-lambda
-       ,@(forthgen-state-code (funcall visitor cc))))))
+       ,(forthgen-state-code (funcall visitor cc))))))
 
 (define-forth-form PROGN (visitor state &rest calls)
   (mapcar (compose visitor #'forthgen-state-code)

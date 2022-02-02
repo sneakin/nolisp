@@ -8,11 +8,13 @@
   (if lst
       (if (atom lst)
           (cons lst result)
-        (flatten (rest lst)
-		 (if (first lst)
-		     (flatten (first lst) result nil)
-		   (cons (first lst) result))
-		 top))
+	(if (listp (rest lst))
+            (flatten (rest lst)
+		     (if (first lst)
+			 (flatten (first lst) result nil)
+		       (cons (first lst) result))
+		     top)
+	  (flatten nil (cons (rest lst) (cons (first lst) result)) top)))
     (if top
         (nreverse result)
       result)))
