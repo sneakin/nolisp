@@ -9,7 +9,7 @@
    ((null lst) (nreverse acc))
    ((null (rest lst)) (fix-improper-list-loop nil (cons (first lst) acc)))
    ((atom (rest lst))
-    (fix-improper-list-loop nil (cons (rest lst) (cons (first lst) acc))))
+    (fix-improper-list-loop nil (list* (rest lst) (first lst) acc)))
    (t (fix-improper-list-loop (rest lst) (cons (first lst) acc)))))
 
 (defun fix-improper-list (lst)
