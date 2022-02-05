@@ -53,7 +53,3 @@
         form
         (macro-expand new-form macros))))
 
-(define-macro LET (bindings &rest body)
-  `((lambda ,(mapcar #'first bindings)
-              ,@body)
-            ,@(mapcar #'second bindings)))

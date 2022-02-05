@@ -16,6 +16,8 @@
     (:file "scanner" :depends-on ("package" "error"))
     (:file "compiler/errors" :depends-on ("package" "error"))
     (:file "compiler/macroexpand" :depends-on ("package" "scanner"))
+    (:file "macros/let" :depends-on ("package" "compiler/macroexpand"))
+    (:file "macros/cond" :depends-on ("package" "compiler/macroexpand"))
     (:file "compiler/cps-transform" :depends-on ("package" "error" "scanner"))
     (:file "compiler/lookup-resolver" :depends-on ("package" "fun"))
     (:file "compiler/forthgen" :depends-on ("package" "scanner" "list" "fun"))
@@ -24,6 +26,8 @@
 	   :depends-on ("package"
 			"compiler/errors"
 			"compiler/macroexpand"
+			"macros/let"
+			"macros/cond"
 			"compiler/cps-transform"
 			"compiler/lookup-resolver"
 			"compiler/forthgen"))))
