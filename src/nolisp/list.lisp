@@ -12,6 +12,14 @@
    ((atom (rest lst)) (fix-improper-list nil (cons (rest lst) (cons (first lst) acc))))
    (t (fix-improper-list (rest lst) (cons (first lst) acc)))))
 
+(defun fix-improper-list! (lst)
+  (if (atom lst)
+      (list lst)
+    (let ((l (last lst)))
+      (if (rest l)
+	  (rplacd l (list (rest l))))
+      lst)))
+
 (defun improper-mapcar (fn lst)
   (handler-case (mapcar fn lst)
     (type-error (e) (mapcar fn (fix-improper-list lst)))))

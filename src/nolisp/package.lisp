@@ -1,6 +1,6 @@
 (defpackage :nolisp
   (:use :cl)
-  (:export fix-improper-list improper-mapcar flatten clip-last nshift-left shift-left shift-right reduce-values
+  (:export fix-improper-list fix-improper-list! improper-mapcar flatten clip-last nshift-left shift-left shift-right reduce-values
 	   ifeq compose partial-first partial-after
 	   match
 	   lerp

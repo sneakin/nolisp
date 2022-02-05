@@ -4,6 +4,14 @@
   (assert-equal (nolisp:fix-improper-list '(1 . 2)) '(1 2))
   (assert-equal (nolisp:fix-improper-list '(1 2 . 3)) '(1 2 3)))
 
+(defun test-fix-improper-list! ()
+  (assert-equal (nolisp:fix-improper-list! '(1)) '(1))
+  (assert-equal (nolisp:fix-improper-list! 1) '(1))
+  (assert-equal (nolisp:fix-improper-list! '(1 . 2)) '(1 2))
+  (assert-equal (nolisp:fix-improper-list! '(1 2 . 3)) '(1 2 3))
+  (let ((l '(1 2 . 3)))
+    (assert-eq (nolisp:fix-improper-list! l) l)))
+
 (defun test-improper-mapcar ()
   (assert-equal (nolisp:improper-mapcar #'identity '(a b c)) '(a b c))
   (assert-equal (nolisp:improper-mapcar #'identity '(a b . c)) '(a b c)))
@@ -84,6 +92,7 @@
 
 (defun test-list ()
   (test-fix-improper-list)
+  (test-fix-improper-list!)
   (test-improper-mapcar)
   (test-flatten)
   (test-clip-last)
