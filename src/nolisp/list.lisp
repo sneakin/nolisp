@@ -4,31 +4,35 @@
 
 (in-package :nolisp)
 
-(defun fix-improper-list (lst &optional acc)
+(defun fix-improper-list-loop (lst &optional acc)
   (cond
-   ((not lst) (nreverse acc))
+   ((null lst) (nreverse acc))
+   ((null (rest lst)) (fix-improper-list-loop nil (cons (first lst) acc)))
+   ((atom (rest lst))
+    (fix-improper-list-loop nil (cons (rest lst) (cons (first lst) acc))))
+   (t (fix-improper-list-loop (rest lst) (cons (first lst) acc)))))
+
+(defun fix-improper-list (lst)
+  (cond
+   ((null lst) lst)
    ((atom lst) (list lst))
-   ((not (rest lst)) (fix-improper-list nil (cons (first lst) acc)))
-   ((atom (rest lst)) (fix-improper-list nil (cons (rest lst) (cons (first lst) acc))))
-   (t (fix-improper-list (rest lst) (cons (first lst) acc)))))
+   ((rest (last lst)) (fix-improper-list-loop lst))
+   (t lst)))
 
 (defun fix-improper-list! (lst)
   (if (atom lst)
       (list lst)
     (let ((l (last lst)))
-      (if (rest l)
-	  (rplacd l (list (rest l))))
+      (if (rest l) (rplacd l (list (rest l))))
       lst)))
 
 (defun improper-mapcar (fn lst)
-  (handler-case (mapcar fn lst)
-    (type-error (e) (mapcar fn (fix-improper-list lst)))))
+  (mapcar fn (fix-improper-list lst)))
 
 (defun flatten (lst)
   (cond
    ((atom lst) (list lst))
-   ((not (rest lst)) lst)
-   ((atom (rest lst)) (list (first lst) (rest lst)))
+   ((null (rest lst)) lst)
    (t (apply #'append (improper-mapcar #'flatten lst)))))
 
 (defun clip-last (lst)
