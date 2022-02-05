@@ -4,35 +4,6 @@
 
 (in-package :nolisp)
 
-(defun flatten1 (lst &optional result (top t))
-  (if lst
-      (if (atom lst)
-          (cons lst result)
-	(if (listp (rest lst))
-            (flatten1 (rest lst)
-		     (if (first lst)
-			 (flatten1 (first lst) result nil)
-		       (cons (first lst) result))
-		     top)
-	  (flatten1 nil (cons (rest lst) (cons (first lst) result)) top)))
-    (if top
-        (nreverse result)
-      result)))
-
-(defun flatten2 (lst)
-  (if (atom lst)
-      (list lst)
-    (if (and (rest lst) (atom (rest lst)))
-	(list (first lst) (rest lst))
-      (apply #'append (mapcar #'flatten2 lst)))))
-
-(defun flatten2 (lst)
-  (cond
-   ((atom lst) (list lst))
-   ((and (rest lst) (atom (rest lst)))
-    (list (first lst) (rest lst)))
-   (t (apply #'append (mapcar #'flatten2 lst)))))
-
 (defun fix-improper-list (lst &optional acc)
   (cond
    ((not lst) (nreverse acc))
