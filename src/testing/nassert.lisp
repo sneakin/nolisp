@@ -8,7 +8,7 @@
 (defmacro assert-with (fn a b &optional msg)
   `(let ((ar ,a))
      (nassert (funcall ,fn ar ,b)
-	      ,(if msg msg `(format nil "~S => ~S not ~S ~S" ',a ar ',fn ',b)))))
+	      ,(if msg msg `(format nil "~S =>~%~S~%not ~S~%~S" ',a ar ',fn ',b)))))
 
 (defmacro assert-eq (a b &optional msg)
   `(assert-with #'eq ,a ,b ,msg))
