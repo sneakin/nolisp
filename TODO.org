@@ -1,0 +1,98 @@
+#+TITLE: NoLisp3 Plan
+#+AUTHOR: Nolan Eakins <sneakin-at-semanticgap.com>
+
+* Todo
+** Compiler top level
+   Compile multiple expressions into a single Forth output.
+*** defun
+*** macros
+**** evaluable in definitions
+**** top level evaluable
+*** defvar
+    Initialized at runtime
+*** defconstant
+*** evaluable forms
+** Data types
+*** Symbols and keywords
+*** Sequences and Strings
+*** Floats
+*** Structures
+*** Dynamic typing
+** Recursion
+   North uses ~repeat-frame~ to recurse. Functions need to substitute calls
+   to self with that.
+*** defun
+    Lookup to replace self calls.
+*** named lambdas
+    Optional name before the arglist.
+    #+BEGIN_SRC lisp
+      (lambda name arglist body...)
+    #+END_SRC
+** Doc strings
+   #+BEGIN_SRC lisp
+     (defun fn (x)
+       "Documentation here"
+       body...)
+   #+END_SRC
+*** Skip and ignore
+*** Symbol table inclusion or assoc list for ~documentation~.
+** Arglists
+   ~&optional~, ~&key~, and ~&rest~ arguments
+   #+BEGIN_SRC lisp
+     (defun fn (x y &optional (z 0) (w 0) &key (normalized t))
+       body)
+   #+END_SRC
+
+   #+BEGIN_SRC
+     \( defun symbol
+              \( reqd*
+	         (&optional (name | \( name default \))*)?
+                 (&key (name | \( name default \))*)?
+              \)
+	 expr* \)
+   #+END_SRC
+   
+   Functions calls need to:
+     - populate missing optional and keyword arguments and terminate &rest arguments.
+     - resolve to a numbered version of the function
+     - and/or count the arguments and call a generalized wrapper that populates
+        missing arguments. Kind of gets into how all calls are made: reuse list
+	made when reading?
+
+   Arguments on stack:
+     - Optional arguments :: filled in at call or filled by wrapper
+     - Keywords :: sorted and filled in like optional arguments
+     - Rest :: just a stack pointer, terminated to become a proper list / sequence
+*** defun
+*** lambdas
+*** calls
+** Runtime
+*** North and/or Forth?
+*** Functions used by generated code
+*** (apply)
+*** (funcall)
+*** Functions for self compilation
+*** eval
+** Garbage collection
+   A basic copy list that keeps what can be reached from the current frame.
+** Inner frame elimination?
+   Use ~overn~ to directly access stack data. Functions with variable length,
+   allocated returns would complicate.
+** Multiple value returns
+*** (values x+)
+    Return values
+*** (values-list list)
+    Returns list as multiple values.
+*** (multiple-value-list expr)
+    Returns values returned by ~expr~ as a list.
+*** (multiple-value-bind (bindings+) expr exprs*)
+    Binds the values returned by ~expr~ to the ~bindings~ for use by the ~exprs~.
+*** apply and/or funcall values
+** Reader
+   Read a byte buffer / stream into symbols and lists.
+   Macros triggered by characters needed for quote, function quote, and backquote.
+** REPL top level
+   Definitions modify the running system, with saving of the running image.
+** Specially made stack machine interpreter
+*** Flattened indirect lists
+*** Lists
