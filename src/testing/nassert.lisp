@@ -1,5 +1,5 @@
 (defmacro nassert (a &optional msg (stream *error-output*))
-  "An assertkfunctionjforkunit testing that when the assertedjvalue is not nilkprints '.' and when nil prints a supplied message."
+  "An assert function for unit testing that when the asserted value is not nil prints '.' and when nil prints a supplied message."
   `(if ,a
        (progn (format ,(or stream *error-output*) ".")
 	      nil)
@@ -78,5 +78,5 @@
   `(assert-not-eq nil (search ,subseq ,expr) ,msg ,stream))
 
 (defmacro assert-output (var contains expr &optional msg stream)
-  "Asserts ~expr~ does not return a sequence containing ~subseq~."
+  "Asserts ~expr~ writes ~contains~ to a stream named by ~var~."
   `(assert-contains ,contains (with-output-to-string (,var) ,expr) ,msg ,stream))
