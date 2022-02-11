@@ -12,12 +12,12 @@
 				   "Fails to find the string." top-s)))))
 
 (defun test-assert-type-of ()
-  (assert-eq nil (assert-type-of 3 '(integer 3 3) "Checks the type."))
+  (assert-eq nil (assert-type-of 'hello 'symbol "Checks the type."))
   (assert-output s "Assertion failed"
      (assert-eq t (assert-type-of 3 'symbol "Checks the type and fails." s)))
   (assert-eq nil (assert-not-type-of 'hello '(integer 3 3) "Checks it's not the type."))
   (assert-output s "Assertion failed"
-    (assert-eq t (assert-not-type-of 3 '(integer 3 3) "Checks it's not the type and fails." s))))
+    (assert-eq t (assert-not-type-of 'hello 'symbol "Checks it's not the type and fails." s))))
 
 (defun test-assert-throws ()
   (assert-eq nil (assert-throws (error 'error) 'error "Asserts the error's type."))
