@@ -1,13 +1,9 @@
 (in-package :nolisp)
 
-(defgeneric error-msg (obj))
-(defgeneric error-form (obj))
-(defgeneric error-state (obj))
-
 (define-condition nolisp-error (error)
-  ((msg :initarg :msg :initform "Error")
-   (form :initarg :form :initform nil)
-   (state :initarg :state :initform nil))
+  ((msg :initarg :msg :initform "Error" :reader error-msg)
+   (form :initarg :form :initform nil :reader error-form)
+   (state :initarg :state :initform nil :reader error-state))
   (:report (lambda (condition stream)
              (format stream "~s:~%Form: ~S~%State: ~S~%"
                      (error-msg condition)
