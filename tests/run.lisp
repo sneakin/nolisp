@@ -30,5 +30,6 @@
   (test-macro-expand)
   (test-cps-transform)
   (test-lookup-walker)
+  (test-to-string)
   (test-compile)
   t)

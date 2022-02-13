@@ -7,6 +7,9 @@
 		  ((hello :nonexit world) "HELLO WORLD")
 		  ((hello :newline world) "HELLO
 WORLD")
+		  ((hello "world") "HELLO world")
+		  (("hello" world) "hello WORLD")
+		  ((hello "\"world\"") "HELLO \"world\"")
 		  ((":" squarer "(" x ")" :newline
 		    begin-frame :newline
 		    "[" begin-frame "(" x ")" :newline

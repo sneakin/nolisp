@@ -1,7 +1,7 @@
 (defun test-compile-form ()
   (assert-matches '((ABC (ABC) "global symbols pass through")
                     (123 (123) "integers pass through")
-                    ("Hello" ("Hello") "strings pass through")
+                    ("Hello" ("\" Hello\"") "strings get quoted")
                     ((+ 2 3 4) (4 3 2 + :nonexit) "math function call")
                     ((f 2 3 4) (4 3 2 f :nonexit) "named function call")
 		    ((> x y) (x y > :nonexit) "reverses args to >")

@@ -96,5 +96,6 @@
     (state (list state atom 'CL-USER::RETURN))
     (t (error 'cps-transform-error :form atom :state state))))
 
-(defun cps-transform (form &optional (state 'CL-USER::RETURN))
-  (scan-list form #'cps-transform-lookup #'cps-transform-list state))
+(defun cps-transform (form &optional state)
+  (scan-list form #'cps-transform-lookup #'cps-transform-list
+	     (or state 'CL-USER::RETURN)))

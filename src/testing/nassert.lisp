@@ -1,9 +1,9 @@
 (defmacro nassert (a &optional msg (stream *error-output*))
   "An assert function for unit testing that when the asserted value is not nil prints '.' and when nil prints a supplied message."
   `(if ,a
-       (progn (format ,(or stream *error-output*) ".")
+       (progn (format (or ,stream *error-output*) ".")
 	      nil)
-     (progn (format ,(or stream *error-output*)
+     (progn (format (or ,stream *error-output*)
 		    "~&Assertion failed: ~A~%~S~%~S~%" ,msg ',a ,a)
             t)))
 
@@ -36,7 +36,11 @@
 	      (let ((result (funcall fn (first c))))
                 (assert-equal result
                               (second c)
-                              (format nil "~A~%~S => ~S~%Not ~S" (third c) (first c) result (second c))
+                              (format nil "~A~%~S => ~S~%Not ~S"
+				      (or (third c) (first c))
+				      (first c)
+				      result
+				      (second c))
 			      stream)))
           cases))
 

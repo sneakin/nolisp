@@ -111,13 +111,15 @@
      (if (< 0 (forthgen-state-depth state))
 	 'CL-USER::exit-frame
        :nonexit))
+    ((stringp sym) (concatenate 'string "\" " sym "\""))
     (t (identity sym)))))
 
-(defun forthgen-scan (form)
-  (scan-list form #'forthgen-atom #'forthgen-list (make-forthgen-state)))
+(defun forthgen-scan (form &optional state)
+  (scan-list form #'forthgen-atom #'forthgen-list
+	     (or state (make-forthgen-state))))
 
-(defun forthgen (form)
-  (forthgen-state-code (forthgen-scan form)))
+(defun forthgen (form &optional state)
+  (forthgen-state-code (forthgen-scan form state)))
 
 ;;;
 ;;; Translated forms
