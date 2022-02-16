@@ -23,13 +23,11 @@ Configure ASDF's source registry so it can find ~nolisp.asd~:
   echo "(:directory (:home \"$NOLISP\"))" > ~/.config/common-lisp/source-registry.conf.d/nolisp.conf
 #+END_SRC
 
-Or by adding the NoLisp directory to ~asdf:*centrol-registry*~:
+Or by adding the NoLisp directory to ~asdf:*centrol-registry*~ such as the
+following for the current directory:
 
 #+BEGIN_SRC lisp
-  (setf asdf:*central-registry*
-	(list* '*default-pathname-defaults*
-		#p"/home/me/nolisp/" ;; change for your system
-		asdf:*central-registry*))
+  (push *defaul-pathname-defaults* asdf:*central-registry*)
 #+END_SRC
 
 * Usage
