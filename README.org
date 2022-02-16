@@ -27,7 +27,7 @@ Or by adding the NoLisp directory to ~asdf:*centrol-registry*~ such as the
 following for the current directory:
 
 #+BEGIN_SRC lisp
-  (push *defaul-pathname-defaults* asdf:*central-registry*)
+  (push *default-pathname-defaults* asdf:*central-registry*)
 #+END_SRC
 
 * Usage
@@ -38,6 +38,22 @@ following for the current directory:
   (require :asdf)
   ;; possibly update asdf:*central-registry*
   (require :nolisp)
+#+END_SRC
+
+** API
+
+The primary interface is through the ~compile-to-forth~ function:
+
+#+BEGIN_SRC lisp
+(nolisp:compile-to-forth '(defun sq (x) (* x x)))
+#+END_SRC
+
+The first argument is the form to be compiled. A second argument is accepted
+to specify what stage to stop at. See the ~nolisp:*stages*~ alist for
+possible values:
+
+#+BEGIN_SRC lisp
+(nolisp:compile-to-forth '(defun sq (x) (* x x)) 'cps-transform)
 #+END_SRC
 
 ** Tests
