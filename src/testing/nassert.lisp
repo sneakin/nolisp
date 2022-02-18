@@ -31,9 +31,9 @@
   `(assert-with (compose #'equal #'not) ,a ,b ,msg ,stream))
 
 (defun assert-cases (cases fn &optional stream)
-  "Maps ~fn~ over a list of input and output pairs asserting ~fn~ passed the input returns the output."
+  "Maps ~fn~ over a list of input and output pairs asserting ~fn~ passed the input returns the output. ~cases~ is a list of triples of ~(input-args result [msg])~."
   (mapcar #'(lambda (c)
-	      (let ((result (funcall fn (first c))))
+	      (let ((result (apply fn (first c))))
                 (assert-equal result
                               (second c)
                               (format nil "~A~%~S => ~S~%Not ~S"

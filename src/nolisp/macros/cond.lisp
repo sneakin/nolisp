@@ -1,10 +1,5 @@
 (in-package :nolisp)
 
-(defun maybe-wrap-with-progn (forms)
-  (if (< 1 (length forms))
-      `(progn ,@forms)
-    (first forms)))
-
 (defun cond-expander (cases)
   (if cases
       (destructuring-bind

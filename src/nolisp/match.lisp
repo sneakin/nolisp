@@ -76,3 +76,47 @@ Example: (match '(pair ( ?name ?value )) '(pair (data 123)))
                     :allow-keywords allow-keywords
 		    :varp varp
                     :test test))))))
+
+(defun match-vars (pattern &optional acc &key (varp #'match-var?))
+  (reduce #'(lambda (acc el)
+	      (cond
+		((funcall varp el) (cons el acc))
+		((listp el) (match-vars el acc :varp varp))
+		(t acc)))
+	  (fix-improper-list pattern)
+	  :initial-value acc))
+
+(defun match-var-name (n)
+  (cond
+    ((question-sym? n) (intern (subseq (symbol-name n) 1)))
+    ((keywordp n) (intern (symbol-name n)))
+    (t n)))
+
+(defmacro match-list-bind (keys lst &rest body)
+  (assoc-bind-gen keys lst :key-namer #'match-var-name :body body))
+
+(defmacro when-match-bind (matched pattern input &rest body)
+  (let ((msym (gensym "match")))
+    `(multiple-value-bind (,msym ,matched)
+	 (match ',pattern ,input)
+       (match-list-bind ,(match-vars pattern) ,msym ,@body))))
+
+(defmacro match-bind (pattern input yes &optional no)
+  (let ((msym (gensym "match"))
+	(yessym (gensym "matched")))
+    `(multiple-value-bind (,msym ,yessym)
+	 (match ',pattern ,input)
+       (if ,yessym
+	   (match-list-bind ,(match-vars pattern) ,msym ,yes)
+	   ,no))))
+
+(defun match-case-cases (input cases)
+  (cond
+    ((eq nil cases) nil)
+    ((eq t (first (first cases))) (maybe-wrap-with-progn (rest (first cases))))
+    (t `(match-bind ,(first (first cases)) ,input
+		    ,(maybe-wrap-with-progn (rest (first cases)))
+		    ,(match-case-cases input (rest cases))))))
+
+(defmacro match-case (input &rest cases)
+  (match-case-cases input cases))
