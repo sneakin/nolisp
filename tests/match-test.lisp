@@ -116,6 +116,21 @@
 			  (assert-equal value nil)
 			  (assert-equal rest nil)))
 
+(defun test-match-bind! ()
+  (assert-equal
+   (nolisp:match-bind! ((?name . ?value) . ?rest) '((hey . 123) (more . 456))
+		       (assert-equal name 'hey)
+		       (assert-equal value 123)
+		       (assert-equal rest '((more . 456)))
+		       :ok)
+   :ok)
+  (assert-throws
+   (nolisp:match-bind! ((?name . ?value) . ?rest) 'nope
+		       (assert-equal name nil)
+		       (assert-equal value nil)
+		       (assert-equal rest nil))
+   'nolisp:match-error))
+
 (defun test-match-case-fn (input)
   (nolisp:match-case input
 		     ((a b c) :abc)
@@ -143,5 +158,6 @@
   (test-assert-mismatches)
   (test-when-match-bind)
   (test-match-bind)
+  (test-match-bind!)
   (test-match-case)
   t)

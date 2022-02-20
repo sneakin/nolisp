@@ -110,6 +110,19 @@ Example: (match '(pair ( ?name ?value )) '(pair (data 123)))
 	   (match-list-bind ,(match-vars pattern) ,msym ,yes)
 	   ,no))))
 
+(define-condition match-error (simple-error)
+  ((pattern :initarg :pattern :reader match-error-pattern)
+   (input :initarg :input :reader match-error-input))
+  (:report (lambda (condition stream)
+	     (format stream "~a did not match ~a~%"
+		     (match-error-input condition)
+		     (match-error-pattern condition)))))
+
+(defmacro match-bind! (pattern input &rest body)
+  `(match-bind ,pattern ,input
+	       ,(maybe-wrap-with-progn body)
+	       (error 'match-error :pattern ',pattern :input ,input)))
+
 (defun match-case-cases (input cases)
   (cond
     ((eq nil cases) nil)

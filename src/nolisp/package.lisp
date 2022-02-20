@@ -3,7 +3,7 @@
   (:export :fix-improper-list :fix-improper-list! :improper-mapcar :flatten :clip-last :nshift-left :shift-left :shift-right :reduce-values
            :ifeq :compose :partial-first :partial-after
            :assoc-get :assoc-bind
-	   :match :when-match-bind :match-bind :match-case
+	   :match :when-match-bind :match-bind :match-bind! :match-error :match-case
 	   :lerp
 	   :frange :range
 	   :scanner-error :scan-list :10scan-list-reducer-fn :scan-list-reducer
