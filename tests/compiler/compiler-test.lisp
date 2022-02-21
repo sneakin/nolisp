@@ -49,15 +49,8 @@
 			end-frame)
 		     "Two nested function call")
                     ((cons :key (list a (cons x y) (list b c (list d e f) g)))
-                     ;; (
-                     ;;  y x cons
-		     ;;  f e d list
-                     ;;  g 1 overn c b list
-                     ;;  10 overn 1 overn a list
-                     ;;  :key cons
-		     ;; )
 		     (y x cons :newline
-			inner-frame "(" ?R0 ")" :newline
+		        inner-frame "(" ?R0 ")" :newline
 			f e d list :newline
 			inner-frame "(" ?R1 ")" :newline
 			g 0 argn c b list :newline
@@ -99,7 +92,7 @@
 		    ((progn 1 (* 2 3) 4)
 		     (3 2 * :newline
 			inner-frame "(" ?R ")" :newline
-			1 0 argn 4 exit-frame :newline
+			4 exit-frame :newline
 			end-frame)
 		     "progn executes each arg, returns the last")
 		    ((if x (+ 2 3))
@@ -157,7 +150,8 @@
 		    ((f (if (> x y) x y))
 		     ;;(x y > IF x f ELSE y f THEN)
 		     ("[" begin-frame "(" ?R ?CC ")" :newline
-		      1 argn f :nonexit end-frame :newline
+		      1 argn f :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?CL ")" :newline
 		      x y > :newline
@@ -199,11 +193,60 @@
 		      end-frame :newline
                       ";")
                      "defun with one call")
+		    ((defun fn (x) (progn (print x) (print (sq x)) :ok))
+		     (":" fn "(" x ")" :newline
+		      begin-frame :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R0 ")" :newline
+		      0 1 lookup sq :newline
+		      inner-frame "(" ?R1 ")" :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R2 ")" :newline
+		      :ok exit-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      ";")
+		     "defun with a progn with multiple calls")
+		    ((defun fn (x) (print x) (print (sq x)))
+		     (":" fn "(" x ")" :newline
+		      begin-frame :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R1 ")" :newline
+		      0 1 lookup sq :newline
+		      inner-frame "(" ?R2 ")" :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R3 ")" :newline
+		      0 argn exit-frame :newline ;; todo unnecessary frame
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      ";")
+		     "defun with two calls")
+		    ((defun fn (x) (print x) (print (sq x)) :ok)
+		     (":" fn "(" x ")" :newline
+		      begin-frame :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R0 ")" :newline
+		      0 1 lookup sq :newline
+		      inner-frame "(" ?R1 ")" :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R2 ")" :newline
+		      :ok exit-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      ";")
+		     "defun with three calls")
                     ((defun fn (x) (- 2 (if (> x 3) 3 4)))
                      (":" FN "(" X ")" :NEWLINE
                       BEGIN-FRAME :NEWLINE
 		      "[" BEGIN-FRAME "(" ?R ?CC ")" :NEWLINE
-		      2 1 ARGN - :NONEXIT END-FRAME :NEWLINE
+		      2 1 ARGN - :NONEXIT :NEWLINE
+		      END-FRAME :NEWLINE
 		      "]" CLOSE-LAMBDA :NEWLINE
 		      INNER-FRAME "(" ?CL ")" :NEWLINE
                       0 1 LOOKUP 3 > :NEWLINE
@@ -220,16 +263,46 @@
                      "subtraction and comparisons get swapped")
                     ((lambda (x) (* x x))
                      ("[" begin-frame "(" x ?cc ")" :newline
-                      1 argn 1 argn *
-                      :nonexit end-frame :newline
+                      1 argn 1 argn * :nonexit :newline
+		      end-frame :newline
                       "]" close-lambda :nonexit)
                      "an anonymous function")
+		    ((lambda (x) (progn (print x) (print (sq x)) :ok))
+		     ("[" begin-frame "(" x ?cc ")" :newline
+		      1 argn print :newline
+		      inner-frame "(" ?R0 ")" :newline
+		      1 1 lookup sq :newline
+		      inner-frame "(" ?R1 ")" :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R2 ")" :newline
+		      :ok exit-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      "]" close-lambda :nonexit)
+		     "lambda with a progn with multiple calls")
+		    ((lambda (x) (print x) (print (sq x)) :ok)
+		     ("[" begin-frame "(" x ?cc ")" :newline
+		      1 argn print :newline
+		      inner-frame "(" ?R0 ")" :newline
+		      1 1 lookup sq :newline
+		      inner-frame "(" ?R1 ")" :newline
+		      0 argn print :newline
+		      inner-frame "(" ?R2 ")" :newline
+		      :ok exit-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      end-frame :newline
+		      "]" close-lambda :nonexit)
+		     "lambda with multiple calls")
                     ((defun squarer () (lambda (x) (* x x)))
                      (":" squarer "(" ")" :newline
                       begin-frame :newline
                       "[" begin-frame "(" x ?cc ")" :newline
-                      1 argn 1 argn *
-                      :nonexit end-frame :newline
+                      1 argn 1 argn * :nonexit :newline
+		      end-frame :newline
                       "]" close-lambda exit-frame :newline
 		      end-frame :newline
                       ";")
@@ -238,7 +311,8 @@
 		     (":" f "(" x ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" a ?cc ")" :newline
-		      1 argn y 0 0 closure-lookup + :nonexit end-frame :newline
+		      1 argn y 0 0 closure-lookup + :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda exit-frame :newline
 		      end-frame :newline
 		      ";")
@@ -247,7 +321,8 @@
 		     (":" f "(" a ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" ?R ?CC ")" :newline
-		      1 argn 0 0 closure-lookup 2 + :nonexit end-frame :newline
+		      1 argn 0 0 closure-lookup 2 + :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?CL ")" :newline
 		      0 1 lookup 0 > :newline
@@ -266,7 +341,8 @@
 		     (":" f "(" a ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" ?R ?CC ")" :newline
-		      1 argn 0 0 closure-lookup 2 + :nonexit end-frame :newline
+		      1 argn 0 0 closure-lookup 2 + :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?CL ")" :newline
 		      0 1 lookup 0 > :newline
@@ -283,7 +359,8 @@
 		     "if with variables as argumonts from a function")
 		    ((mapcar (lambda (i) (* i i)) lst)
 		     ("[" begin-frame "(" i ?cc ")" :newline
-		      1 argn 1 argn * :nonexit end-frame :newline
+		      1 argn 1 argn * :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?R ")" :newline
 		      lst 0 argn mapcar exit-frame :newline
@@ -291,7 +368,8 @@
 		     "lambda as an argument")
 		    (((lambda (x) (who x)) 3 4 5)
 		     ("[" begin-frame "(" x ?cc ")" :newline
-		      1 argn who :nonexit end-frame :newline
+		      1 argn who :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?RL ")" :newline
 		      5 4 3 0 argn exec exit-frame :newline
@@ -301,7 +379,8 @@
 			   (y (* 2 2)))
 		       (+ x y))
 		     ("[" begin-frame "(" y x ?CC ")" :newline
-		      2 argn 1 argn + :nonexit end-frame :newline
+		      2 argn 1 argn + :nonexit :newline
+		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?RL ")" :newline
 		      3 2 + :newline

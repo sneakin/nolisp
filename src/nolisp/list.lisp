@@ -35,6 +35,15 @@
    ((null (rest lst)) lst)
    (t (apply #'append (improper-mapcar #'flatten lst)))))
 
+(defun nth-cons (n lst)
+  (cond
+    ((and (>= n 0) (< n 1)) lst)
+    (lst (nth-cons (- n 1) (rest lst)))
+    (t nil)))
+
+(defun nth-cons-from-end (n lst)
+  (nth-cons (- (length lst) n) lst))
+
 (defun clip-last (lst)
   (let ((rl (reverse lst)))
     (values (nreverse (rest rl))

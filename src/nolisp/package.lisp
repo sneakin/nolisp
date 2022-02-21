@@ -1,6 +1,6 @@
 (defpackage :nolisp
   (:use :cl)
-  (:export :fix-improper-list :fix-improper-list! :improper-mapcar :flatten :clip-last :nshift-left :shift-left :shift-right :reduce-values
+  (:export :fix-improper-list :fix-improper-list! :improper-mapcar :flatten :nth-cons :nth-cons-from-end :clip-last :nshift-left :shift-left :shift-right :reduce-values
            :ifeq :compose :partial-first :partial-after
            :assoc-get :assoc-bind
 	   :match :when-match-bind :match-bind :match-bind! :match-error :match-case

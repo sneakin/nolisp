@@ -19,10 +19,9 @@
   `(CL-USER::λ (,sym) ,form))
 
 (defun cps-wrap (sym form cc)
-  (cond
-   ((or (null cc) (eq sym cc)) form)
-   ((cps-atom? cc) `(,@form ,cc))
-   (t `(,@form ,(cps-lambda sym cc)))))
+  (if (cps-atom? cc)
+      `(,@form ,cc)
+      `(,@form ,(cps-lambda sym cc))))
 
 (defun cps-transform-call-emit (fns ops visitor &optional (first-call t))
   (if fns
@@ -30,10 +29,10 @@
              (sym (first (first fns)))
              (new-form (funcall visitor form (cps-lambda sym ops))))
         (cps-transform-call-emit (rest fns)
-                                    new-form
-                                    visitor
-                                    nil))
-      ops))
+                                 new-form
+                                 visitor
+                                 nil))
+       ops))
 
 (defun cps-transform-call (form visitor state &optional args fns (sym (gensym "R")))
   (if form
@@ -53,14 +52,15 @@
 
 (defun cps-emit-if (form visitor state cc)
   (funcall visitor (second form)
-	   `(CL-USER::λ (cl-user::test)
-			(if cl-user::test
+	   (cps-lambda 'cl-user::test
+		       `(if cl-user::test
 			    ,(funcall visitor (third form) cc)
-			  ,(funcall visitor (fourth form) cc)))))
+			    ,(funcall visitor (fourth form) cc)))))
 
 (defun cps-transform-list (form visitor state)
   (case (first form)
     (nil state)
+    ;; (if test then else)
     (IF
      ;; transform IF statements so any caller is placed inside
      ;; a new lambda used as the continuation of the two clauses
@@ -69,18 +69,26 @@
        (let ((cc (gensym "CC")))
          `(CL:LAMBDA ,(second state)
 		     ,@(cddr state)
-		     (CL-USER::λ (,cc) ,(cps-emit-if form visitor state cc))))))
+	    (CL-USER::λ (,cc) ,(cps-emit-if form visitor state cc))))))
+    ;; (lambda arglist exprs*)
     (LAMBDA `(CL:LAMBDA ,(second form)
 			,(funcall visitor
 				  (if (fourth form)
-				      (rest (rest form))
-				    (third form))
+				      (cons 'progn (rest (rest form)))
+				      (third form))
 				  'CL-USER::RETURN)
-			,state))
+	       ,state))
+    ;; (defun name arglist exprs*)
     (DEFUN `(CL:DEFUN ,(second form) ,(third form)
                       ,(funcall visitor (if (fifth form)
-					    (rest (rest (rest form)))
-					  (fourth form)))))
+					    (cons 'progn (rest (rest (rest form))))
+					    (fourth form)))))
+    ;; (progn exprs*)
+    (PROGN
+      (if (eq nil (third form))
+	  (funcall visitor (second form))
+	  (cps-transform-call form visitor state)))
+    ;; (func args*)
     (t (cps-transform-call form visitor state))))
 
 (defun cps-uncurry (form value)

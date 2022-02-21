@@ -153,14 +153,14 @@
     (multiple-value-bind
      (body cc) (clip-last body)
      `("[" CL-USER::begin-frame  "(" ,@(reverse args) ")" :newline
-       ,@(mapcar inner-visitor body)
+       ,@(mapcar inner-visitor body) :newline
        CL-USER::end-frame :newline
        "]" CL-USER::close-lambda
        ,(forthgen-state-code (funcall visitor cc))))))
 
 (define-forth-form PROGN (visitor state &rest calls)
   (mapcar (compose visitor #'forthgen-state-code)
-	  calls))
+	  (nth-cons-from-end 2 calls)))
 
 (define-forth-form RETURN (visitor state arg)
   (let ((code (forthgen-state-code (funcall visitor arg))))

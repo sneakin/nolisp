@@ -26,6 +26,19 @@
   (assert-equal (nolisp:flatten '(a nil b)) '(a nil b))
   (assert-equal (nolisp:flatten '(1 (a nil b) 2)) '(1 a nil b 2)))
 
+(defun test-nth-cons ()
+  (assert-equal (nolisp:nth-cons -1 '(a b c d)) nil)
+  (assert-equal (nolisp:nth-cons 0 '(a b c d)) '(a b c d))
+  (assert-equal (nolisp:nth-cons 2 '(a b c d)) '(c d))
+  (assert-equal (nolisp:nth-cons 4 '(a b c d)) nil))
+
+(defun test-nth-cons-from-end ()
+  (assert-equal (nolisp:nth-cons-from-end 0 '(a b c d)) nil)
+  (assert-equal (nolisp:nth-cons-from-end 1 '(a b c d)) '(d))
+  (assert-equal (nolisp:nth-cons-from-end 2 '(a b c d)) '(c d))
+  (assert-equal (nolisp:nth-cons-from-end 4 '(a b c d)) '(a b c d))
+  (assert-equal (nolisp:nth-cons-from-end 5 '(a b c d)) nil))
+
 (defun test-clip-last ()
   (assert-values-equal (nolisp:clip-last '(1)) '(() 1))
   (assert-values-equal (nolisp:clip-last '(1 2)) '((1) 2))
@@ -95,6 +108,8 @@
   (test-fix-improper-list!)
   (test-improper-mapcar)
   (test-flatten)
+  (test-nth-cons)
+  (test-nth-cons-from-end)
   (test-clip-last)
   (test-shift-left)
   (test-shift-right)
