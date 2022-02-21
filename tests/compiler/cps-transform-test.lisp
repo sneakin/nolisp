@@ -82,5 +82,11 @@
 		     (defun f (a)
 		       (lambda (?R) (+ 2 a ?R RETURN)
 			 (λ (?CC) (> a 0 (λ (?T) (if ?T (* a 2 ?CC) (* a -2 ?CC)))))))
-		     "if with variables as argumonts from a function"))
+		     "if with variables as argumonts from a function")
+		    ((defun f (x y) (if x (if y t)))
+		     (defun f (x y)
+		       (if x
+			   (if y (RETURN t) (RETURN nil))
+			   (RETURN nil)))
+		     "defun with nested IFs"))
 		  :fn #'nolisp:cps-transform))

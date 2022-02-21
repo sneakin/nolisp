@@ -50,7 +50,7 @@
                                (cps-wrap sym (reverse args) state)
                                visitor)))
 
-(defun cps-emit-if (form visitor state cc)
+(defun cps-emit-if (form visitor cc)
   (funcall visitor (second form)
 	   (cps-lambda 'cl-user::test
 		       `(if cl-user::test
@@ -64,12 +64,12 @@
     (IF
      ;; transform IF statements so any caller is placed inside
      ;; a new lambda used as the continuation of the two clauses
-     (if (or (eq state nil) (eq state 'CL-USER::RETURN))
-	 (cps-emit-if form visitor state state)
+     (if (or (eq state nil) (symbolp state) (eq state 'CL-USER::RETURN))
+	 (cps-emit-if form visitor state)
        (let ((cc (gensym "CC")))
          `(CL:LAMBDA ,(second state)
 		     ,@(cddr state)
-	    (CL-USER::λ (,cc) ,(cps-emit-if form visitor state cc))))))
+	    (CL-USER::λ (,cc) ,(cps-emit-if form visitor cc))))))
     ;; (lambda arglist exprs*)
     (LAMBDA `(CL:LAMBDA ,(second form)
 			,(funcall visitor

@@ -44,6 +44,15 @@
 (defun nth-cons-from-end (n lst)
   (nth-cons (- (length lst) n) lst))
 
+(defun set-nth! (n lst value)
+  (rplaca (nth-cons n lst) value))
+
+(defun indexes (lst)
+  (range 0 (length lst)))
+
+(defun set-nth (n lst value &optional result)
+  (map 'list #'(lambda (i e) (if (eq i n) value e)) (indexes lst) lst))
+
 (defun clip-last (lst)
   (let ((rl (reverse lst)))
     (values (nreverse (rest rl))
