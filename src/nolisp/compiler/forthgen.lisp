@@ -110,9 +110,10 @@
     ((eq sym 'CL-USER::return)
      (if (< 0 (forthgen-state-depth state))
 	 'CL-USER::exit-frame
-       :nonexit))
+	 :nonexit))
+    ((keywordp sym) (list 'cl-user::keyword> sym))
     ((stringp sym) (concatenate 'string "\" " sym "\""))
-    (t (identity sym)))))
+    (t sym))))
 
 (defun forthgen-scan (form &optional state)
   (scan-list form #'forthgen-atom #'forthgen-list

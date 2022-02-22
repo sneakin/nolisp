@@ -2,6 +2,7 @@
   (assert-matches '((ABC (ABC) "global symbols pass through")
                     (123 (123) "integers pass through")
                     ("Hello" ("\" Hello\"") "strings get quoted")
+		    (:key (keyword> :KEY) "promotes keywords from strings")
                     ((+ 2 3 4) (4 3 2 + :nonexit) "math function call")
                     ((f 2 3 4) (4 3 2 f :nonexit) "named function call")
 		    ((> x y) (x y > :nonexit) "reverses args to >")
@@ -57,7 +58,7 @@
 			inner-frame "(" ?R2 ")" :newline
 			0 argn 0 2 lookup a list :newline
 			inner-frame "(" ?R3 ")" :newline
-			0 argn :key cons exit-frame :newline
+			0 argn keyword> :KEY cons exit-frame :newline
 			end-frame :newline
 			end-frame :newline
 			end-frame :newline
@@ -202,7 +203,7 @@
 		      inner-frame "(" ?R1 ")" :newline
 		      0 argn print :newline
 		      inner-frame "(" ?R2 ")" :newline
-		      :ok exit-frame :newline
+		      keyword> :OK exit-frame :newline
 		      end-frame :newline
 		      end-frame :newline
 		      end-frame :newline
@@ -234,7 +235,7 @@
 		      inner-frame "(" ?R1 ")" :newline
 		      0 argn print :newline
 		      inner-frame "(" ?R2 ")" :newline
-		      :ok exit-frame :newline
+		      keyword> :OK exit-frame :newline
 		      end-frame :newline
 		      end-frame :newline
 		      end-frame :newline
@@ -275,7 +276,7 @@
 		      inner-frame "(" ?R1 ")" :newline
 		      0 argn print :newline
 		      inner-frame "(" ?R2 ")" :newline
-		      :ok exit-frame :newline
+		      keyword> :OK exit-frame :newline
 		      end-frame :newline
 		      end-frame :newline
 		      end-frame :newline
@@ -290,7 +291,7 @@
 		      inner-frame "(" ?R1 ")" :newline
 		      0 argn print :newline
 		      inner-frame "(" ?R2 ")" :newline
-		      :ok exit-frame :newline
+		      keyword> :OK exit-frame :newline
 		      end-frame :newline
 		      end-frame :newline
 		      end-frame :newline
