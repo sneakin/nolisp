@@ -5,7 +5,7 @@
   #'(lambda (x)
       (eq x a)))
 
-(defmacro compose (&rest fns)
+(defmacro mcompose (&rest fns)
   "Returns a function that calls each function in ~fns~ successively with the output from the prior function.
 
 Example: (compose #'equal #'not) => (lambda (a b) (not (equal a b)))"
@@ -13,6 +13,15 @@ Example: (compose #'equal #'not) => (lambda (a b) (not (equal a b)))"
      ,(reduce #'(lambda (acc fn) `(funcall ,fn ,acc))
 	      (rest fns)
 	      :initial-value `(apply ,(first fns) args))))
+
+(defun compose (&rest fns)
+  "Returns a function that calls each function in ~fns~ successively with the output from the prior function.
+
+Example: (compose #'equal #'not) => (lambda (a b) (not (equal a b)))"
+  #'(lambda (&rest args)
+      (reduce #'(lambda (acc fn) (funcall fn acc))
+	      (rest fns)
+	      :initial-value (apply (first fns) args))))
 
 (defun partial-first (fn &rest args)
   "Returns a function that is partially evaluated with ~args~ as the first arguments. Any arguments passed to the returned function appear after ~args~.

@@ -6,22 +6,28 @@
 
 (in-package :nolisp)
 
-(defvar *stages* `((macro-expand . ,#'macro-expand)
-		   (cps-transform . ,#'cps-transform)
-		   (lookup-resolver . ,#'lookup-resolver)
-		   (forthgen . ,#'forthgen)
-		   (flatten . ,#'flatten)
-		   (to-string . ,#'to-string)))
+(defvar *stages* `((macro-expand ,#'macro-expand ,*macros*)
+		   (cps-transform ,#'cps-transform)
+		   (lookup-resolver ,#'lookup-resolver)
+		   (forthgen ,#'forthgen)
+		   (flatten ,#'flatten)
+		   (to-string ,#'to-string)))
 
-(defun compile-to-forth (form &optional to-stage (stages *stages*) last-stage)
-  (if (numberp to-stage)
-      (compile-to-forth form (car (nth to-stage stages)) stages)
-    (if (and stages (not (and last-stage (eq to-stage last-stage))))
-	(compile-to-forth (funcall (cdr (first stages)) form)
-			  to-stage
-			  (rest stages)
-			  (first (first stages)))
-      form)))
+(defun compile-reducer (input stages states &optional new-states)
+  (if stages
+      (multiple-value-bind (output new-state)
+	  (if (first states)
+	      (funcall (second (first stages)) input (first states))
+	      (funcall (second (first stages)) input))
+       (compile-reducer output
+			(rest stages)
+			(rest states)
+			(cons new-state new-states)))
+    (values input (nreverse new-states))))
+
+(defun compile-to-forth (form &optional to-stage (stages *stages*))
+  (let ((stages (copy-assoc-until-n to-stage stages)))
+    (compile-reducer form stages (mapcar #'third stages))))
 
 ;;;
 ;;; Helper ~compile-to-forth~ wrappers:

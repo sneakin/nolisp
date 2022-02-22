@@ -17,6 +17,7 @@
 	(princ arg stream)
 	(to-string/2 stream (rest form) nil))))))
 
-(defun to-string (form)
+(defun to-string (form &optional _state)
+  (declare (ignore _state))
   (with-output-to-string (str)
     (to-string/2 str form)))

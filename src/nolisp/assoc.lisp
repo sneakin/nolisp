@@ -15,3 +15,14 @@
   (values-list
    (mapcar (partial-first #'nth-cons (position 'macro-expand alist :key #'first))
 	   more-lists)))
+
+(defun copy-assoc-until (key lst)
+  (let ((n (position key lst :key #'first)))
+    (if n (first+n (+ 1 n) lst)
+    )))
+
+(defun copy-assoc-until-n (key lst)
+  (cond
+    ((numberp key) (first+n key lst))
+    (key (copy-assoc-until key lst))
+    (t lst)))

@@ -32,4 +32,5 @@
   (test-lookup-walker)
   (test-to-string)
   (test-compile)
+  (test-toplevel)
   t)

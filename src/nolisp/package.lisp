@@ -12,4 +12,5 @@
 	   :lookup-resolver
 	   :cps-transform
 	   :*stages* :compile-to-forth
-	   :compile-to-lookup :compile-to-list :compile-to-flatlist :to-string :compile-to-string))
+	   :compile-to-lookup :compile-to-list :compile-to-flatlist :to-string :compile-to-string
+           :toplevel-default-states :toplevel-compile :toplevel-compile-stream :toplevel-compile-file))

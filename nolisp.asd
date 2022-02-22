@@ -16,6 +16,7 @@
     (:file "math" :depends-on ("package"))
     (:file "range" :depends-on ("package" "math"))
     (:file "scanner" :depends-on ("package" "error"))
+    (:file "io" :depends-on ("package"))
     (:file "compiler/errors" :depends-on ("package" "error"))
     (:file "compiler/macroexpand" :depends-on ("package" "scanner"))
     (:file "macros/let" :depends-on ("package" "compiler/macroexpand"))
@@ -24,6 +25,7 @@
     (:file "compiler/lookup-resolver" :depends-on ("package" "fun"))
     (:file "compiler/forthgen" :depends-on ("package" "scanner" "list" "fun"))
     (:file "compiler/to-string" :depends-on ("package"))
+    (:file "compiler/toplevel" :depends-on ("package" "scanner" "list" "fun" "io" "compiler"))
     (:file "compiler"
 	   :depends-on ("package"
 			"compiler/errors"
@@ -32,4 +34,5 @@
 			"macros/cond"
 			"compiler/cps-transform"
 			"compiler/lookup-resolver"
-			"compiler/forthgen"))))
+			"compiler/forthgen"
+			))))

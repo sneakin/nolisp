@@ -35,6 +35,11 @@
    ((null (rest lst)) lst)
    (t (apply #'append (improper-mapcar #'flatten lst)))))
 
+(defun first+n (n lst)
+  (if (and n (< n (length lst)))
+      (subseq lst 0 n)
+      lst))
+
 (defun nth-cons (n lst)
   (cond
     ((and (>= n 0) (< n 1)) lst)
