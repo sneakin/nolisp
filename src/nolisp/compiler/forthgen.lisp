@@ -127,6 +127,7 @@
 ;;;
 
 (define-forth-form IF (visitor state test then else)
+  (declare (ignore state))
   (list (forthgen-state-code (funcall visitor test))
 	'CL-USER::IF :newline
 	(forthgen-state-code (funcall visitor then)) :newline
@@ -160,6 +161,7 @@
        ,(forthgen-state-code (funcall visitor cc))))))
 
 (define-forth-form PROGN (visitor state &rest calls)
+  (declare (ignore state))
   (mapcar (compose visitor #'forthgen-state-code)
 	  (nth-cons-from-end 2 calls)))
 
@@ -170,13 +172,24 @@
       code)))
 
 (define-forth-form ARGN (visitor state n)
+  (declare (ignore visitor state))
   `(,n CL-USER::ARGN))
 
 (define-forth-form LOOKUP (visitor state depth n)
+  (declare (ignore visitor state))
   `(,n ,depth CL-USER::LOOKUP))
 
 (define-forth-form CLOSURE-LOOKUP (visitor state depth n)
+  (declare (ignore visitor state))
   `(,n ,depth CL-USER::CLOSURE-LOOKUP))
+
+(define-forth-form defvar (visitor state name value cc)
+  (declare (ignore state cc))
+  `(,(forthgen-state-code (funcall visitor value)) CL-USER::VAR> ,name))
+
+(define-forth-form defconstant (visitor state name value cc)
+  (declare (ignore state cc))
+  `(,(forthgen-state-code (funcall visitor value)) CL-USER::CONST> ,name))
 
 ;;;
 ;;; Forms where arguments need reversing.
@@ -184,10 +197,10 @@
 
 (defun forthgen-arg-reverser (op)
   #'(lambda (visitor state &rest args)
-      (multiple-value-bind
-       (lst last-item) (clip-last args)
-       (mapcar (compose visitor #'forthgen-state-code)
-	       (append lst (list op last-item))))))
+      (declare (ignore state))
+      (multiple-value-bind (lst last-item) (clip-last args)
+	(mapcar (compose visitor #'forthgen-state-code)
+		(append lst (list op last-item))))))
 
 (mapcar (compose
 	 #'(lambda (op) (intern (symbol-name op) :cl-user))
