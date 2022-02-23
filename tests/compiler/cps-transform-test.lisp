@@ -52,6 +52,17 @@
                      (lambda (x) (who x RETURN) (λ (:R) (boo :R 3 RETURN))))
                     (((lambda (x) (who x)) 3 4 5)
                      (lambda (x) (who x RETURN) (λ (:R) (:R 3 4 5 RETURN))))
+		    ((+ x y z
+		      (lambda (x)
+			(+ x y z
+			   (lambda (y)
+			     (+ x y z (lambda (z) (* x y z)))))))
+		     (LAMBDA (X)
+		       (LAMBDA (Y)
+			 (LAMBDA (Z) (* X Y Z RETURN) (λ (?R1) (+ x y z ?R1 RETURN)))
+			 (λ (?R2) (+ x y z ?R2 RETURN)))
+		       (λ (?R3) (+ x y z ?R3 RETURN)))
+		     "lambdas with nested lookups")
                     ((boo (if night you me))
 		     (lambda (?R) (boo ?R RETURN)
 		       (λ (?CC)

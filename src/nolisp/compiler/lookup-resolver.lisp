@@ -4,14 +4,20 @@
 
 (in-package :nolisp)
 
-(defun make-frame (args &optional parent env)
-  (list args parent env))
+(defun make-frame (args &optional parent env (depth 0))
+  (list args parent env depth))
 (defun frame-parent (frame)
   (second frame))
 (defun frame-lookup-1 (frame sym)
   (position sym (first frame)))
 (defun frame-closure (frame)
   (third frame))
+(defun frame-closure-depth (frame)
+  (fourth frame))
+(defun frame-depth (frame &optional (n 0))
+  (if (frame-parent frame)
+      (frame-depth (frame-parent frame) (+ 1 n))
+      n))
 
 (defun frame-lookup (frame sym &optional (depth 0))
   (if frame
@@ -20,24 +26,33 @@
             (values index depth)
             (frame-lookup (frame-parent frame) sym (+ depth 1))))))
 
+(defun frame-closure-lookup (frame sym &optional (cc-depth 0))
+  (if frame
+      (multiple-value-bind (index depth)
+	  (frame-lookup frame sym)
+        (if index
+            (values cc-depth depth index)
+            (frame-closure-lookup (frame-closure frame) sym (+ cc-depth 1))))))
+
 (defun lookup-form? (form)
   (and (listp form)
        (or (eq 'CL-USER::ARGN (first form))
            (eq 'CL-USER::LOOKUP (first form))
 	   (eq 'CL-USER::CLOSURE-LOOKUP (first form)))))
 
-(defun lookup-resolver-atom (form state &optional (depth 0))
+(defun lookup-resolver-atom (form state)
   (multiple-value-bind (index depth)
       (frame-lookup state form)
     (if index
         (if (eq depth 0)
             (list 'CL-USER::ARGN index)
             (list 'CL-USER::LOOKUP depth index))
-      (multiple-value-bind (index depth)
-	  (frame-lookup (frame-closure state) form)
+      (multiple-value-bind (cc-depth depth index)
+	  (frame-closure-lookup (frame-closure state) form)
 	(if index
-	    (list 'CL-USER::CLOSURE-LOOKUP depth index)
-	  form)))))
+	    (list 'CL-USER::CLOSURE-LOOKUP
+		  cc-depth (frame-closure-depth state) depth index)
+	    form)))))
 
 (defun lookup-resolver-call (visitor state args &optional ops)
   (if args
@@ -59,14 +74,18 @@
 			  ,@(mapcar (partial-after visitor
 						   (make-frame (cons closure args)
 							       nil
-							       state))
+							       state
+							       0))
 				    body)
 			  ,(funcall visitor cont state)))))
     (CL-USER::λ
      (let ((args (second form))
 	   (body (rest (rest form))))
        `(CL-USER::λ ,args
-		    ,@(mapcar (partial-after visitor (make-frame args state))
+		    ,@(mapcar (partial-after visitor
+					     (make-frame args state
+							 (frame-closure state)
+							 (+ 1 (or (frame-closure-depth state) 0))))
 			      body))))
     (CL-USER::DEFUN
      (let ((name (second form))

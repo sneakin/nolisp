@@ -179,9 +179,9 @@
   (declare (ignore visitor state))
   `(,n ,depth CL-USER::LOOKUP))
 
-(define-forth-form CLOSURE-LOOKUP (visitor state depth n)
+(define-forth-form CLOSURE-LOOKUP (visitor state cc-depth cc-links depth n)
   (declare (ignore visitor state))
-  `(,n ,depth CL-USER::CLOSURE-LOOKUP))
+  `(,n ,depth ,cc-links ,cc-depth CL-USER::CLOSURE-LOOKUP))
 
 (define-forth-form FUNCTION (visitor state n cc)
   (declare (ignore state))

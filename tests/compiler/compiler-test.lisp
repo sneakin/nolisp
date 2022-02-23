@@ -332,7 +332,7 @@
 		     (":" f "(" x ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" a ?cc ")" :newline
-		      1 argn y 0 0 closure-lookup + :nonexit :newline
+		      1 argn y 0 0 0 0 closure-lookup + :nonexit :newline
 		      end-frame :newline
 		      "]" close-lambda exit-frame :newline
 		      end-frame :newline
@@ -342,7 +342,7 @@
 		     (":" f "(" a ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" ?R ?CC ")" :newline
-		      1 argn 0 0 closure-lookup 2 + :nonexit :newline
+		      1 argn 0 0 0 0 closure-lookup 2 + :nonexit :newline
 		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?CL ")" :newline
@@ -362,7 +362,7 @@
 		     (":" f "(" a ")" :newline
 		      begin-frame :newline
 		      "[" begin-frame "(" ?R ?CC ")" :newline
-		      1 argn 0 0 closure-lookup 2 + :nonexit :newline
+		      1 argn 0 0 0 0 closure-lookup 2 + :nonexit :newline
 		      end-frame :newline
 		      "]" close-lambda :newline
 		      inner-frame "(" ?CL ")" :newline
@@ -378,6 +378,19 @@
 		      end-frame :newline
 		      ";")
 		     "if with variables as argumonts from a function")
+		    ((defun f (x) (lambda (n) (+ x (* x x))))
+		     (":" F "(" X ")" :newline
+		      BEGIN-FRAME :newline
+		      "[" BEGIN-FRAME "(" N ?CC ")" :newline
+		      0 0 0 0 CLOSURE-LOOKUP 0 0 0 0 CLOSURE-LOOKUP * :newline
+		      INNER-FRAME "(" ?R0 ")" :newline
+		      0 ARGN 0 0 1 0 CLOSURE-LOOKUP + EXIT-FRAME :newline
+		      END-FRAME :newline
+		      END-FRAME :newline
+		      "]" CLOSE-LAMBDA EXIT-FRAME :newline
+		      END-FRAME :newline
+		      ";")
+		     "defun w/ a closed variable nested in a frame")
 		    ((mapcar (lambda (i) (* i i)) lst)
 		     ("[" begin-frame "(" i ?cc ")" :newline
 		      1 argn 1 argn * :nonexit :newline
@@ -396,6 +409,41 @@
 		      5 4 3 0 argn exec exit-frame :newline
 		      end-frame)
 		     "lambda in first position")
+		    ((+ x y z
+		      (lambda (x)
+			(+ x y z
+			   (lambda (y)
+			     (+ x y z (lambda (z) (* x y z)))))))
+		     ;; (LAMBDA (?CC0 X)
+		     ;;   (LAMBDA (?CC1 Y)
+		     ;; 	 (LAMBDA (?CC2 Z)
+		     ;; 	   (* (closure-lookue 2 0 1) (closure-lookup 1 0 1) (argn 1)
+		     ;; 	      RETURN)
+		     ;; 	   (λ (R1) (+ (closure-lookup 1 0 1)
+		     ;; 		      (lookup 1 1) z (argn 0)
+		     ;; 		      RETURN)))
+		     ;; 	 (λ (R2) (+ (lookup 1 1) y z (argn 0) RETURN)))
+		     ;;   (λ (R3) (+ x y z (argn 0) RETURN)))
+		     ("[" BEGIN-FRAME "(" X ?CC0 ")" :NEWLINE
+		      "[" BEGIN-FRAME "(" Y ?CC1 ")" :NEWLINE
+		      "[" BEGIN-FRAME "(" Z ?CC2 ")" :NEWLINE
+		      1 ARGN 1 0 0 0 CLOSURE-LOOKUP 1 0 0 1 CLOSURE-LOOKUP * :NONEXIT :NEWLINE
+		      END-FRAME :NEWLINE
+		      "]" CLOSE-LAMBDA :NEWLINE
+		      INNER-FRAME "(" ?R0 ")" :NEWLINE
+		      0 ARGN Z 1 1 LOOKUP 1 0 1 0 CLOSURE-LOOKUP + EXIT-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
+		      "]" CLOSE-LAMBDA :NEWLINE
+		      INNER-FRAME "(" ?R1 ")" :NEWLINE
+		      0 ARGN Z Y 1 1 LOOKUP + EXIT-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
+		      END-FRAME :NEWLINE
+		      "]" CLOSE-LAMBDA :NEWLINE
+		      INNER-FRAME "(" ?R2 ")" :NEWLINE
+		      0 ARGN Z Y X + EXIT-FRAME :NEWLINE
+		      END-FRAME)
+		     "deeply nested lookup")
 		    ((let ((x (+ 2 3))
 			   (y (* 2 2)))
 		       (+ x y))
