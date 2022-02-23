@@ -63,11 +63,9 @@
       (nreverse ops)))
 
 (defun lookup-resolver-list (form visitor state)
-  (case (first form)
-    (CL-USER::LAMBDA
-     (let ((args (second form))
-	   (closure (gensym "CC"))
-	   (body (rest (rest form))))
+  (match-case form
+    ((CL-USER::LAMBDA ?args . ?body)
+     (let ((closure (gensym "CC")))
        (multiple-value-bind
 	(body cont) (clip-last body)
 	`(CL-USER::LAMBDA (,closure ,@args)
@@ -78,21 +76,16 @@
 							       0))
 				    body)
 			  ,(funcall visitor cont state)))))
-    (CL-USER::λ
-     (let ((args (second form))
-	   (body (rest (rest form))))
-       `(CL-USER::λ ,args
-		    ,@(mapcar (partial-after visitor
-					     (make-frame args state
-							 (frame-closure state)
-							 (+ 1 (or (frame-closure-depth state) 0))))
-			      body))))
-    (CL-USER::DEFUN
-     (let ((name (second form))
-	   (args (third form))
-	   (body (rest (rest (rest form)))))
-       `(CL-USER::DEFUN ,name ,args
-			,@(mapcar (partial-after visitor (make-frame args)) body))))
+    ((CL-USER::λ ?args . ?body)
+     `(CL-USER::λ ,args
+		  ,@(mapcar (partial-after visitor
+					   (make-frame args state
+						       (frame-closure state)
+						       (+ 1 (or (frame-closure-depth state) 0))))
+			    body)))
+    ((CL-USER::DEFUN ?name ?args . ?body)
+     `(CL-USER::DEFUN ,name ,args
+	,@(mapcar (partial-after visitor (make-frame args)) body)))
     (t (if (lookup-form? form)
            form
          (lookup-resolver-call visitor state form)))))

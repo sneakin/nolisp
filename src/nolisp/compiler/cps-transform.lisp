@@ -58,10 +58,10 @@
 			    ,(funcall visitor (fourth form) cc)))))
 
 (defun cps-transform-list (form visitor state)
-  (case (first form)
+  (match-case form
     (nil state)
     ;; (if test then else)
-    (IF
+    ((IF ?test . ?cases)
      ;; transform IF statements so any caller is placed inside
      ;; a new lambda used as the continuation of the two clauses
      (if (or (eq state nil) (symbolp state) (eq state 'CL-USER::RETURN))
@@ -71,30 +71,32 @@
 		     ,@(cddr state)
 	    (CL-USER::λ (,cc) ,(cps-emit-if form visitor cc))))))
     ;; (lambda arglist exprs*)
-    (LAMBDA `(CL:LAMBDA ,(second form)
-			,(funcall visitor
-				  (if (fourth form)
-				      (cons 'progn (rest (rest form)))
-				      (third form))
-				  'CL-USER::RETURN)
-	       ,state))
+    ((LAMBDA ?arglist . ?body)
+     `(CL:LAMBDA ,arglist
+	,(funcall visitor
+		  (if (second body)
+		      (cons 'progn body)
+		      (first body))
+		  'CL-USER::RETURN)
+	,state))
     ;; (defun name arglist exprs*)
-    (DEFUN `(CL:DEFUN ,(second form) ,(third form)
-                      ,(funcall visitor (if (fifth form)
-					    (cons 'progn (rest (rest (rest form))))
-					    (fourth form)))))
+    ((DEFUN ?name ?arglist . ?body)
+     `(CL:DEFUN ,name ,arglist
+                      ,(funcall visitor (if (second body)
+					    (cons 'progn body)
+					    (first body)))))
     ;; (progn exprs*)
-    (PROGN
-      (if (eq nil (third form))
-	  (funcall visitor (second form))
+    ((PROGN . ?body)
+      (if (eq nil (second body))
+	  (funcall visitor (first body))
 	  (cps-transform-call form visitor state)))
     ;; #'name | #'(lambda ...)
-    (FUNCTION
-     (if (lambda-form? (second form))
+    ((FUNCTION ?form)
+     (if (lambda-form? form)
 	 ;; unwrap lambdas
-	 (funcall visitor (second form))
+	 (funcall visitor form)
 	 ;; pass through other forms
-	 `(CL-USER::FUNCTION ,(second form) ,state)))
+	 `(CL-USER::FUNCTION ,form ,state)))
     ;; (func args*)
     (t (cps-transform-call form visitor state))))
 
