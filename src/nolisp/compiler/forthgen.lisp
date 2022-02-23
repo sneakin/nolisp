@@ -183,6 +183,11 @@
   (declare (ignore visitor state))
   `(,n ,depth CL-USER::CLOSURE-LOOKUP))
 
+(define-forth-form FUNCTION (visitor state n cc)
+  (declare (ignore state))
+  ;; quote names
+  (list "'" n (forthgen-state-code (funcall visitor cc))))
+
 (define-forth-form defvar (visitor state name value cc)
   (declare (ignore state cc))
   `(,(forthgen-state-code (funcall visitor value)) CL-USER::VAR> ,name))

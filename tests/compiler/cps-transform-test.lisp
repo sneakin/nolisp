@@ -7,6 +7,7 @@
                      (* 3 4 (λ (:R) (+ 2 :R 5 RETURN))))
                     ((+ 2 (sqrt (* 3 4)) 5)
                      (* 3 4 (λ (:R0) (sqrt :R0 (λ (:R1) (+ 2 :R1 5 RETURN))))))
+		    ((boo #'list) (function list (λ (:R1) (boo :R1 RETURN))) "functions pass through")
 		    ((progn)
 		     (RETURN nil))
 		    ((progn (+ 2 3))

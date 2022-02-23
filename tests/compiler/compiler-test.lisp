@@ -3,6 +3,13 @@
                     (123 (123) "integers pass through")
                     ("Hello" ("\" Hello\"") "strings get quoted")
 		    (:key (keyword> :KEY) "promotes keywords from strings")
+		    (#'list ("'" list :nonexit) "quotes functions")
+		    ((boo #'list)
+		     ("'" LIST :newline
+		      INNER-FRAME "(" ?R1 ")" :newline
+		      0 ARGN BOO EXIT-FRAME :newline
+		      END-FRAME)
+		     "function an argument")
                     ((+ 2 3 4) (4 3 2 + :nonexit) "math function call")
                     ((f 2 3 4) (4 3 2 f :nonexit) "named function call")
 		    ((> x y) (x y > :nonexit) "reverses args to >")
@@ -308,6 +315,19 @@
 		      end-frame :newline
                       ";")
                      "function returning an anonymous function")
+		    (#'(lambda () 123)
+		     ("[" BEGIN-FRAME "(" ?CC2 ")" :newline
+		      123 :newline
+		      END-FRAME :newline
+		      "]" CLOSE-LAMBDA :nonexit) "function quoted lambdas")
+		    (#'(lambda () (boo #'list))
+		     ("[" BEGIN-FRAME "(" ?CC2 ")" :newline
+		      "'" LIST :newline
+		      INNER-FRAME "(" ?R1 ")" :newline
+		      0 ARGN BOO EXIT-FRAME :newline
+		      END-FRAME :newline
+		      END-FRAME :newline
+		      "]" CLOSE-LAMBDA :nonexit) "function quoted lambdas containing a quoted function")
 		    ((defun f (x) (lambda (a) (+ x y a)))
 		     (":" f "(" x ")" :newline
 		      begin-frame :newline

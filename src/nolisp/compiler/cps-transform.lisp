@@ -88,6 +88,13 @@
       (if (eq nil (third form))
 	  (funcall visitor (second form))
 	  (cps-transform-call form visitor state)))
+    ;; #'name | #'(lambda ...)
+    (FUNCTION
+     (if (lambda-form? (second form))
+	 ;; unwrap lambdas
+	 (funcall visitor (second form))
+	 ;; pass through other forms
+	 `(CL-USER::FUNCTION ,(second form) ,state)))
     ;; (func args*)
     (t (cps-transform-call form visitor state))))
 
