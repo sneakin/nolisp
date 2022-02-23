@@ -4,6 +4,7 @@
   :author "Nolan Eakins <sneakin@semanticgap.com>"
   :licence "Private"
   :depends-on ("nolisp")
+  :build-operation program-op
   :build-pathname "nolisp3"
   :entry-point "nolisp-cli:start"
   :pathname "src/nolisp-cli"
