@@ -12,6 +12,12 @@
     Initialized at runtime
 *** defconstant
 *** evaluable forms
+** Quoting
+*** quote
+   Needs forthgen output
+   Lookup Resolver ignoring
+*** backquote
+    ~`(word ,include ,@append)~
 ** Data types
 *** Symbols and keywords
 *** Sequences and Strings

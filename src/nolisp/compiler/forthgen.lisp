@@ -183,6 +183,12 @@
   (declare (ignore visitor state))
   `(,n ,depth ,cc-links ,cc-depth CL-USER::CLOSURE-LOOKUP))
 
+;; (define-forth-form QUOTE (visitor state sym cc)
+;;   (declare (ignore visitor state))
+;;   (if (symbolp sym)
+;;       `(CL-USER::QUOTE> ,sym ,(funcall visitor cc))
+;;       (error 'nolisp-error :form sym :state state)))
+
 (define-forth-form FUNCTION (visitor state n cc)
   (declare (ignore state))
   ;; quote names
