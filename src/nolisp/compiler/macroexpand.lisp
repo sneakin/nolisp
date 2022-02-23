@@ -50,6 +50,6 @@
 (defun macro-expand (form &optional macros)
   (let ((new-form (macro-expand-1 form macros)))
     (if (equal form new-form)
-        form
+        (values form macros)
         (macro-expand new-form macros))))
 
