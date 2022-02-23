@@ -1,14 +1,18 @@
-#!/usr/bin/env -S ecl --shell
-
 (eval-when (:execute)
   (require :asdf)
   (require :nolisp-cli))
 
 (in-package :nolisp-cli)
 
+(defun command-args ()
+  #+ecl (or ext:*unprocessed-ecl-command-args* (ext:command-args))
+  #+sbcl sb-ext:*posix-argv*)
+
 (defun main (args)
   (format t "( Built with NoLisp3 )~%")
-  (format *error-output* "( Build Args: )~%  ~s~%  ~s~%" args (ext:command-args))
+  (format *error-output* "( Build Args: )~%  ~s~%  ~s~%"
+          args
+          (command-args))
   (let ((state (reduce #'(lambda (state path)
 			   (format t "~%( ~a )~%~%" path)
 			   (multiple-value-bind (out new-state)
@@ -19,7 +23,4 @@
 	(nolisp:toplevel-compile-stream *standard-input* nolisp:*stages* state :fn #'princ))))
 
 (defun start ()
-  (main ext:*unprocessed-ecl-command-args*))
-
-(eval-when (:execute)
-  (start))
+  (main (command-args)))

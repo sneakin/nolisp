@@ -8,4 +8,6 @@
   :entry-point "nolisp-cli:start"
   :pathname "src/nolisp-cli"
   :components ((:file "package")
-	       (:file "main" :depends-on ("package"))))
+               #+ecl(:file "main-ecl")
+               #+sbcl(:file "main-sbcl")
+	       (:file "main" :depends-on ("package" #+ecl"main-ecl" #+sbcl"main-sbcl"))))
