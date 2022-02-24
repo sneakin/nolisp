@@ -101,10 +101,11 @@
     (t (cps-transform-call form visitor state))))
 
 (defun cps-uncurry (form value)
-  (let ((body (subst value (first (second form)) (third form))))
-    (if (eq 1 (length (second form)))
-        body
-        (list (first form) (rest (second form)) body))))
+  (destructuring-bind (kind args exprs) form
+    (let ((body (subst value (first args) exprs)))
+      (if (eq 1 (length args))
+          body
+          (list kind (rest args) body)))))
 
 (defun cps-transform-lookup (atom state)
   (cond
