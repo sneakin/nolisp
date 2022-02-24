@@ -21,6 +21,7 @@
     (:file "compiler/macroexpand" :depends-on ("package" "scanner"))
     (:file "macros/let" :depends-on ("package" "compiler/macroexpand"))
     (:file "macros/cond" :depends-on ("package" "macro-helpers" "compiler/macroexpand"))
+    (:file "compiler/quoting" :depends-on ("package" "error" "scanner" "match"))
     (:file "compiler/cps-transform" :depends-on ("package" "error" "scanner" "match"))
     (:file "compiler/lookup-resolver" :depends-on ("package" "fun" "scanner" "match"))
     (:file "compiler/forthgen" :depends-on ("package" "scanner" "list" "fun"))
@@ -32,6 +33,7 @@
 			"compiler/macroexpand"
 			"macros/let"
 			"macros/cond"
+			"compiler/quoting"
 			"compiler/cps-transform"
 			"compiler/lookup-resolver"
 			"compiler/forthgen"

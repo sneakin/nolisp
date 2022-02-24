@@ -7,6 +7,7 @@
 (in-package :nolisp)
 
 (defvar *stages* `((macro-expand ,#'macro-expand ,*macros*)
+		   (quoting ,#'quoting-transform)
 		   (cps-transform ,#'cps-transform)
 		   (lookup-resolver ,#'lookup-resolver)
 		   (forthgen ,#'forthgen)

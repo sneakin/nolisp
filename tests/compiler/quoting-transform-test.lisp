@@ -1,0 +1,48 @@
+(defun test-unquote-list (&optional (fn #'nolisp::unquote-list))
+  (assert-cases
+   '(((a) 'a "symbols get quoted")
+     ((123) 123 "numbers pass through")
+     ((nil) nil "nil pass through")
+     (((a . b)) (cons 'a 'b) "cons cells get consed, symbols quoted")
+     (((1 . 2)) (cons 1 2) "cons cells get consed")
+     (((a b c)) (list 'a 'b 'c) "list items get quoted")
+     (((1 2 3)) (list 1 2 3) "numbers get listed")
+     (((a b . c)) (list* 'a (cons 'b 'c)) "improper lists end w/ cons")
+     (((1 2 . 3)) (list* 1 (cons 2 3)) "improper lists of numbers end w/ cons")
+     (((a b (c d))) (list 'a 'b (list 'c 'd)) "nested lists")
+     (((a b (c d (e f)))) (list 'a 'b (list 'c 'd (list 'e 'f))) "nested lists")
+     ) fn))
+
+(defun test-quasiquote-list ()
+  (test-unquote-list #'nolisp::quasiquote-list)
+  (assert-cases
+   '((((a b (unquote (x y)))) (list 'a 'b (x y)) "unquoted call")
+     (((a b (unquote x))) (list 'a 'b x) "unquoted value")
+     (((a b (unquote-splice (x y)))) (list 'a 'b x y) "unquote-spliced call")
+     (((a b (unquote-splice x))) (list 'a 'b x) "unquote-spliced value")
+     ) #'nolisp::quasiquote-list))
+
+(defun test-quoting-transformer ()
+  (assert-cases
+   '(((abc) abc "unquoted pass through")
+     ((124) 124 "numbers pass through")
+     (('abc) 'abc "unlished quoted symbols pass through")
+     ((('abc)) ('abc) "toplevel singlet list passes through")
+     ((('abc 'def)) ('abc 'def) "toplevel list passes through")
+     (('(abc def)) (list 'abc 'def) "quoted list makes a list")
+     (((append 'abc 'def)) (append 'abc 'def) "quoted args stay quoted")
+     (((first '(abc 'def))) (first (list 'abc (list 'quote 'def))) "quoted list as call argument with internal quote")
+     (((first '(abc . def))) (first (cons 'abc 'def)) "quoted cons as call argument")
+     (((+ 2 124)) (+ 2 124) "calls pass through")
+     (((print 1 '(a b))) (print 1 (list 'a 'b)) "calls unquote args")
+     (((print 1 '(a b . c))) (print 1 (list* 'a (cons 'b 'c))) "calls unquote args, even improper lists")
+     ((`(+ ,x x)) (list '+ x 'x) "quasiquoting")
+     ((`(+ ,@(1 2 3) 4)) (list '+ 1 2 3 4) "quasiquoting splicing") ;; maybe not?
+     ;;((`(+ ,@(list 1 2 3) 4)) (list '+ 1 2 3 4) "quasiquoting splicing") ;; maybe not?
+     ) #'nolisp::quoting-transform))
+
+(defun test-quoting ()
+  (test-unquote-list)
+  (test-quasiquote-list)
+  (test-quoting-transformer)
+  t)

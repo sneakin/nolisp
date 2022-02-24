@@ -40,7 +40,7 @@
          (macro (assoc name (macro-list macros))))
     (if macro
         (apply (cdr macro) args)
-        (mapcar visitor form))))
+        (map-improper visitor form))))
 
 (defun macro-expand-1 (form &optional macros)
   (scan-list form

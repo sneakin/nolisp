@@ -29,6 +29,14 @@
 (defun improper-mapcar (fn lst)
   (mapcar fn (fix-improper-list lst)))
 
+(defun map-improper (fn lst &optional acc)
+  (cond
+    ((eq nil lst) (nreverse acc))
+    ((atom lst) (funcall fn lst))
+    ((and (rest lst) (atom (rest lst)))
+     (append (nreverse acc) (funcall fn lst)))
+    (t (map-improper fn (rest lst) (cons (funcall fn (first lst)) acc)))))
+
 (defun flatten (lst)
   (cond
    ((atom lst) (list lst))
@@ -55,7 +63,7 @@
 (defun indexes (lst)
   (range 0 (length lst)))
 
-(defun set-nth (n lst value &optional result)
+(defun set-nth (n lst value)
   (map 'list #'(lambda (i e) (if (eq i n) value e)) (indexes lst) lst))
 
 (defun clip-last (lst)
