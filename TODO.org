@@ -4,26 +4,35 @@
 * Todo
 ** Compiler top level
    Compile multiple expressions into a single Forth output.
-*** defun
+*** DONE defun
 *** macros
-**** evaluable in definitions
-**** top level evaluable
-*** defvar
+**** DONE evaluable in definitions
+**** DONE top level evaluable
+**** Unable to call macros from the macros.
+*** DONE defvar
     Initialized at runtime
-*** defconstant
-*** evaluable forms
+*** DONE defconstant
+*** DONE evaluable forms
+
 ** Quoting
-*** quote
+*** DONE quote
    Needs forthgen output
    Lookup Resolver ignoring
 *** backquote
     ~`(word ,include ,@append)~
+**** Needs to eval forms that are unquoted
+
 ** Data types
+*** Lists
+*** Integers
 *** Symbols and keywords
 *** Sequences and Strings
 *** Floats
 *** Structures
 *** Dynamic typing
+
+** Tighter closures where closed bindings get passed to close-lombda?
+
 ** Recursion
    North uses ~repeat-frame~ to recurse. Functions need to substitute calls
    to self with that.
@@ -34,6 +43,7 @@
     #+BEGIN_SRC lisp
       (lambda name arglist body...)
     #+END_SRC
+
 ** Doc strings
    #+BEGIN_SRC lisp
      (defun fn (x)
@@ -42,11 +52,21 @@
    #+END_SRC
 *** Skip and ignore
 *** Symbol table inclusion or assoc list for ~documentation~.
+
+** Macros
+*** (execute (eval-when)) macro
+
 ** Arglists
    ~&optional~, ~&key~, and ~&rest~ arguments
    #+BEGIN_SRC lisp
-     (defun fn (x y &optional (z 0) (w 0) &key (normalized t))
+     (defun fn (x y &optional (z 0) (w 1) &key (normalized t) &rest body)
        body)
+
+     (fn 1 2)
+     (fn 1 2 3)
+     (fn 1 2 3 4 :normalized nil)
+     (fn 1 2 3 4 :normalized nil 100 200)
+     (fn 1 2 :normalized t) ;; error
    #+END_SRC
 
    #+BEGIN_SRC
@@ -54,6 +74,7 @@
               \( reqd*
 	         (&optional (name | \( name default \))*)?
                  (&key (name | \( name default \))*)?
+                 (&rest name)?
               \)
 	 expr* \)
    #+END_SRC
@@ -72,6 +93,7 @@
 *** defun
 *** lambdas
 *** calls
+
 ** Runtime
 *** North and/or Forth?
 *** Functions used by generated code
@@ -79,11 +101,14 @@
 *** (funcall)
 *** Functions for self compilation
 *** eval
+
 ** Garbage collection
    A basic copy list that keeps what can be reached from the current frame.
+
 ** Inner frame elimination?
    Use ~overn~ to directly access stack data. Functions with variable length,
    allocated returns would complicate.
+
 ** Multiple value returns
 *** (values x+)
     Return values
@@ -94,11 +119,36 @@
 *** (multiple-value-bind (bindings+) expr exprs*)
     Binds the values returned by ~expr~ to the ~bindings~ for use by the ~exprs~.
 *** apply and/or funcall values
+
+** callcc
+   #+BEGIN_SRC lisp
+     (print (callcc (cc) (print 'new-thread) (setf x cc) (funcall cc :done)))
+     (print 'after)
+   #+END_SRC
+
+** Methods
+   Functions that dispatch on argument types.
+   #+BEGIN_SRC lisp
+     (defmethod to-float ((float n)) n)
+     (defmethod to-float ((integer n)) (int->float n))
+     (defmethod to-float ((string n)) (parse-float n))
+     (defmethod sqrt ((float n)) (float-sqrt n))
+     (defmethod sqrt (n) (sqrt (to-float n)))
+   #+END_SRC
+
 ** Reader
    Read a byte buffer / stream into symbols and lists.
    Macros triggered by characters needed for quote, function quote, and backquote.
-** REPL top level
-   Definitions modify the running system, with saving of the running image.
+
+** Assembler
+*** Inline assembly
+*** Standalone tool
+*** Assembly output of a call thread
+
 ** Specially made stack machine interpreter
 *** Flattened indirect lists
 *** Lists
+
+** REPL top level
+   Definitions modify the running system, with saving of the running image.
+
