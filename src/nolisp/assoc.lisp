@@ -1,7 +1,7 @@
 (in-package :nolisp)
 
-(defun assoc-get (key lst)
-  (rest (assoc key lst)))
+(defun assoc-get (item lst &key (test #'equal))
+  (rest (assoc item lst :test test)))
 
 (defun assoc-bind-gen (keys lst &key (key-namer #'identity) body)
   `(destructuring-bind ,(mapcar key-namer keys)

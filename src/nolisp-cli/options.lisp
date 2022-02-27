@@ -1,0 +1,26 @@
+(in-package :nolisp-cli)
+
+(defconstant *default-option-flags* '("help" "debug"))
+
+(defun is-option? (str)
+  (eq #\- (elt str 0)))
+(defun option-name (str)
+  (subseq str (if (eq #\- (elt str 1)) 2 1)))
+
+(defun parse-options (args &optional (flags *default-option-flags*) values left-over)
+  (cond
+    ((eq args nil) (values values left-over))
+    ((find (option-name (first args)) flags :test #'equal)
+     (parse-options (rest args)
+		    flags
+		    (acons (option-name (first args)) t values)
+		    left-over))
+    ((is-option? (first args))
+     (parse-options (rest (rest args))
+		    flags
+		    (acons (option-name (first args)) (second args) values)
+		    left-over))
+    (t (parse-options (rest args) flags values (cons (first args) left-over)))))
+
+(defun option-value (option alist)
+  (nolisp:assoc-get option alist :test #'equal))
