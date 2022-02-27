@@ -184,7 +184,7 @@
   `(,n ,depth ,cc-links ,cc-depth CL-USER::CLOSURE-LOOKUP))
 
 (define-forth-form QUOTE (visitor state sym cc)
-  (declare (ignore visitor state))
+  (declare (ignore state))
   `(CL-USER::QUOTE> ,sym ,(forthgen-state-code (funcall visitor cc))))
 
 (define-forth-form FUNCTION (visitor state n cc)

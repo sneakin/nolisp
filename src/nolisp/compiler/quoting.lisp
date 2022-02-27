@@ -61,7 +61,7 @@
 	 (quasiquote-list (rest form)
 			  (if (and (listp result)
 				   (unquoted-splice? (first form)))
-			      (nconc (nreverse result) acc)
+			      (concatenate 'list (reverse result) acc)
 			      (cons result acc)))))))
 
 (defun quoting-list (form visitor state)
