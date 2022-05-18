@@ -1,7 +1,7 @@
 (defpackage :nolisp
   (:use :cl)
-  (:export :fix-improper-list :fix-improper-list! :improper-mapcar :flatten :nth-cons :nth-cons-from-end :clip-last :nshift-left :shift-left :shift-right :reduce-values
-           :ifeq :compose :partial-first :partial-after
+  (:export :last? :improper-cell? :fix-improper-list :fix-improper-list! :improper-mapcar :mapl-improper :map-improper :mapelt-improper :flatten :nth-cons :nth-cons-from-end :clip-last :nshift-left :shift-left :shift-right :reduce-values
+           :ifeq :ifequal :compose :partial-first :partial-after
            :assoc-get :assoc-get-all :assoc-bind
 	   :match :when-match-bind :match-bind :match-bind! :match-error :match-case
 	   :lerp
