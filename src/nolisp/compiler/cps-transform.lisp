@@ -16,7 +16,8 @@
   (and (listp form) (eq 'CL-USER::LAMBDA (first form))))
 
 (defun cps-lambda (sym form)
-  `(CL-USER::λ (,sym) ,form))
+  (let ((sym (if (atom sym) (list sym) sym)))
+    `(CL-USER::λ ,sym ,form)))
 
 (defun cps-wrap (sym form cc)
   (if (cps-atom? cc)
@@ -53,7 +54,7 @@
 (defun cps-emit-if (form visitor cc)
   (funcall visitor (second form)
 	   (cps-lambda 'cl-user::test
-		       `(if cl-user::test
+		       `(cl-user::if cl-user::test
 			    ,(funcall visitor (third form) cc)
 			    ,(funcall visitor (fourth form) cc)))))
 
