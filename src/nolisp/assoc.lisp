@@ -3,6 +3,9 @@
 (defun assoc-get (item lst &key (test #'equal))
   (rest (assoc item lst :test test)))
 
+(defun assoc-get-all (item lst &key (test #'equal) (key #'first) (value #'rest))
+  (mapcar value (remove-if-not #'(lambda (i) (funcall test item i)) lst :key key)))
+
 (defun assoc-bind-gen (keys lst &key (key-namer #'identity) body)
   `(destructuring-bind ,(mapcar key-namer keys)
        (mapcar #'(lambda (k) (assoc-get k ,lst)) ',keys)

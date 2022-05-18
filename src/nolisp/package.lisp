@@ -2,7 +2,7 @@
   (:use :cl)
   (:export :fix-improper-list :fix-improper-list! :improper-mapcar :flatten :nth-cons :nth-cons-from-end :clip-last :nshift-left :shift-left :shift-right :reduce-values
            :ifeq :compose :partial-first :partial-after
-           :assoc-get :assoc-bind
+           :assoc-get :assoc-get-all :assoc-bind
 	   :match :when-match-bind :match-bind :match-bind! :match-error :match-case
 	   :lerp
 	   :frange :range
