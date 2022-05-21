@@ -6,7 +6,7 @@
 	   :match :when-match-bind :match-bind :match-bind! :match-error :match-case
 	   :lerp
 	   :frange :range
-	   :scanner-error :scan-list :10scan-list-reducer-fn :scan-list-reducer
+	   :scanner-error :scan-list :scan-list-reducer
 	   :error-msg :error-form :error-state :error
 	   :*macros* :macro? :add-macro :remove-macro :macro-expand-1 :macro-expand
 	   :lookup-resolver
