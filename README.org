@@ -30,6 +30,27 @@ following for the current directory:
   (push *default-pathname-defaults* asdf:*central-registry*)
 #+END_SRC
 
+** Building CLI Frontend
+
+A command line executable can be built using ECL or SBCL. To do so run
+either of the following depending on your Lisp:
+
+ECL:
+
+#+BEGIN_SRC shell
+./src/nolisp/cli/ecl/build.lisp
+#+END_SRC
+
+SBCL:
+
+#+BEGIN_SRC shell
+./src/nolisp/cli/sbcl/build.lisp
+#+END_SRC
+
+There's a ~main.lisp~ that can be executed directly without building a
+binary.
+
+
 * Usage
 
 ** Loading
