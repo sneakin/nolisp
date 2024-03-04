@@ -42,12 +42,30 @@
         (provide mod-name)
         (error 'repl-load-error :module mod-name :path file-name))))
 
+#+sbcl
 (defun repl-load (&optional reload)
   (unless (find #'repl-module-loader *module-provider-functions*)
     (push #'repl-module-loader *module-provider-functions*))
   (if (and reload (find "REPL" *modules* :test #'string=))
       (setf *modules* nil))
   (require :repl))
+
+#+ecl
+(progn
+  (require '#:package-locks)
+  (si:fset 'sys-require #'require)
+  (ext:without-package-locks
+      (defun require (mod)))
+  (eval-when (:compile-toplevel :execute)
+    (ext:without-package-locks
+	(defun require (mod)
+	  (unless (find mod *modules* :test #'string=)
+	    (handler-case (repl-module-loader mod)
+	      (repl-module-not-found-error (_) (sys-require mod)))))))
+  (defun repl-load (&optional reload)
+    (if (and reload (find "REPL" *modules* :test #'string=))
+	(setf *modules* nil))
+    (require :repl)))
 
 (defun repl-reload ()
   (load "sbcl.lisp")
