@@ -34,6 +34,7 @@
 (define-condition no-input-files-error (simple-error)
   ()
   (:report (lambda (condition stream)
+	     (declare (ignorable condition))
              (format stream "No input file specified.~%"))))
 
 (defun repl-compiler-compile (input-file output-file &optional (data-segment-offset (* 2 1024 1024)))

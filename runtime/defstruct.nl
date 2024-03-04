@@ -2,6 +2,7 @@
 
 (require "type-sizes")
 (require "memory")
+(require "string")
 
 (in-package :repl)
 
