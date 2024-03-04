@@ -96,17 +96,17 @@
 (defun symbol-concat-pkg (pkg &optional a b c d e)
   (symbol-concat a b c d e))
 
-#+:sbcl
+#-:repl
 (defun symbol-concat (&rest parts)
   (apply 'symbol-concat-pkg *package* parts))
 
-#+:sbcl
+#-:repl
 (defun intern-keyword (str)
   (if (symbolp str)
       str
       (intern (string-upcase str) "KEYWORD")))
 
-#-:sbcl
+#+:repl
 (defun intern-keyword (str)
   (with-allocation (buffer 128)
     (ptr-write-string str buffer)

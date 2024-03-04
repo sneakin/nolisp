@@ -1,6 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-#+:sbcl
+#-:repl
 (defpackage :repl
   (:use :cl)
   (:export :undefined-variable-error
@@ -77,7 +77,7 @@
            :repl-defstruct
            ))
 
-#+:sbcl
+#+(or :sbcl :ecl)
 (in-package :repl)
 
 (require "compiler")

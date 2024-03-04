@@ -7,14 +7,14 @@
 
 ;; todo merge with string-position, position
 
-#-:sbcl
+#+:repl
 (defun index-of (needle haystack)
   (let ((ptr (pointer-of needle haystack)))
     (if ptr
         (- ptr haystack)
         -1)))
 
-#+:sbcl
+#-:repl
 (defun index-of (needle haystack &optional (n 0))
   (if (< n (length haystack))
       (if (eq needle (char-code (aref haystack n)))

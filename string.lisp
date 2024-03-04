@@ -6,21 +6,21 @@
 #+:repl (require "runtime/string")
 #+:repl (require "runtime/convertors")
 
-#+:sbcl
+#-:repl
 (defun string-aref (str n)
   (let ((str (ptr-read-string str)))
     (if (>= n (length str))
         0
         (aref str n))))
 
-#-:sbcl
+#+:repl
 (defun string-concat (a b output)
   (ptr-write-string b (- (ptr-write-string a output) 1)))
 
-#+:sbcl
+#-:repl
 (defun string-concat (a b output)
   (ptr-write-string b (- (ptr-write-string a output) 1)))
 
-#+:sbcl
+#-:repl
 (defun string-position (char str &optional (n 0))
   (position char (ptr-read-string str) :start n))

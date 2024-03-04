@@ -1,5 +1,5 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
-#+:sbcl
+#-:repl
 (require "conditions")
 
 (require "memory")
@@ -18,7 +18,7 @@
 (defvar *LIST-INITIATORS* "([{")
 (defvar *LIST-TERMINATORS* ")]}")
 (defvar *SPECIALS* "()[]\"'`")
-#+:sbcl
+#-:repl
 (defvar *SPACES* (format nil "~c~c~c~c" #\space #\newline #\tab #\return))
 #+:repl
 (defvar *SPACES* " \t\n\r")
