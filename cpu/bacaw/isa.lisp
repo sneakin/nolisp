@@ -126,9 +126,33 @@
 (defun seq-read-byte (seq offset)
   (elt seq (+ offset 0)))
 
+#+sbcl
 (defun seq-read-float (seq offset)
   (let ((bits (seq-read-long seq offset)))
     (sb-kernel:make-single-float bits)))
+
+#+ecl
+(progn
+  (defun seq-read-float (seq &optional (offset 0))
+    (ffi:c-inline (seq offset) ('(simple-vector 4) :fixnum) :float
+		  "union { unsigned char b[4]; float f; } vu;
+vu.b[0] = ecl_to_uint(#0->vector.self.t[#1]);
+vu.b[1] = ecl_to_uint(#0->vector.self.t[#1+1]);
+vu.b[2] = ecl_to_uint(#0->vector.self.t[#1+2]);
+vu.b[3] = ecl_to_uint(#0->vector.self.t[#1+3]);
+@(return)= vu.f;"
+		  :one-liner nil))
+
+  (defun seq-write-float (v seq &optional (offset 0))
+    (ffi:c-inline (seq offset v) ((simple-vector 4) :fixnum :float) (simple-vector 4)
+		  "float v = #2;
+union { unsigned char b[4]; float f; } *vu = &v;
+#0->vector.self.t[#1] = ecl_make_fixnum(vu->b[0]);
+#0->vector.self.t[#1+1] = ecl_make_fixnum(vu->b[1]);
+#0->vector.self.t[#1+2] = ecl_make_fixnum(vu->b[2]);
+#0->vector.self.t[#1+3] = ecl_make_fixnum(vu->b[3]);
+@(return)= #0;"
+		  :one-liner nil)))
 
 (defun read-op-data (data-type seq offset)
   (case data-type

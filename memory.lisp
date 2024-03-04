@@ -233,6 +233,25 @@
 (defun ptr-write-float (value ptr)
   (ptr-write-long (sb-kernel:single-float-bits value) ptr))
 
+#+ecl
+(progn
+  (defun ptr-read-float (ptr)
+    (let ((bits (ptr-read-long ptr)))
+      (ffi:c-inline (bits) (:fixnum) :float
+		    "union { unsigned int n; float f; } vu;
+vu.n = #0;
+@(return)= vu.f;"
+		    :one-liner nil)))
+
+  (defun ptr-write-float (value ptr)
+    (ptr-write-ulong
+     (ffi:c-inline (value) (:float) :fixnum
+		   "union { unsigned int n; float f; } vu;
+vu.f = #0;
+@(return)= vu.n;"
+		   :one-liner nil)
+		     ptr)))
+
 (defun ptr-find-string= (str stack-start stack-end)
   (if (< stack-start stack-end)
       (let ((current (ptr-read-string stack-start)))
