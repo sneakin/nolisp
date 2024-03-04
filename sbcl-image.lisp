@@ -1,12 +1,29 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 ;;; Generate an executable image for the compiler.
 
-(load "sbcl.lisp")
+(eval-when (:compile-toplevel :execute)
+  (load "sbcl.lisp"))
 
 (require "logging")
 
 #+:WIN32 (defconstant EXECUTABLE-EXT ".exe")
 #-:WIN32 (defconstant EXECUTABLE-EXT "")
+
+#+:sbcl
+(defun command-args () sb-ext:*posix-argv*)
+#+:ecl
+(defun command-args () (ext:command-args))
+
+#+:sbcl
+(defvar *shell-args* '("--script"))
+#+:ecl
+(defvar *shell-args* '("--shell"))
+
+(defun remove-shell-args (args)
+  (if args
+      (if (find (car args) *shell-args* :test #'string=)
+	  (cddr args)
+	  (cons (car args) (remove-shell-args (rest args))))))
 
 (defun parse-command-line-arg (args)
   (let ((arg (first args)))
@@ -54,15 +71,15 @@
   (format *standard-output* "          --no-tail  Do not optimize tail calls.~%")
   (format *standard-output* "~%"))
 
-(defun repl-compiler-toplevel ()
+(defun repl-compiler-toplevel (&optional (args (command-args)))
   "Command line entry point for the compiler."
   (multiple-value-bind (options more-args)
-      (parse-command-line-args (rest sb-ext:*posix-argv*))
+      (parse-command-line-args (rest args))
     (let ((input-file (first more-args))
           (output-file (cdr (assoc :output options)))
           (search-path (cdr (assoc :search-path options)))
           (data-segment-offset (or (cdr (assoc :data-segment options)) (* 2 1024 1024)))
-          (image-root (make-pathname :directory (pathname-directory (pathname (first sb-ext:*posix-argv*)))))
+          (image-root (make-pathname :directory (pathname-directory (pathname (first args)))))
           (log-level (or (cdr (assoc :log-level options)) :info))
           (no-tail (cdr (assoc :no-tail options))))
       ;; set logger level and reset logger stream
@@ -102,15 +119,34 @@
 (defun repl-disasm-toplevel ()
   "Command line entry point for the disassembler."
   (multiple-value-bind (options more-args)
-      (parse-command-line-args (rest sb-ext:*posix-argv*))
+      (parse-command-line-args (rest (command-args)))
     (let ((input-file (first more-args)))
       (if (assoc :help options)
           (repl-disasm-help)
           (repl-disasm-disasm input-file)))))
 
+#+:sbcl
 (defun repl-save-image (path toplevel)
   "Saves the Lisp core image to PATH using REPL-COMPILER-TOPLEVEL as the init function."
   (save-lisp-and-die path :toplevel toplevel :executable t :purify t))
+
+#+:ecl
+(progn
+  (require :cmp)
+  (defun quiet-compile (path &rest args)
+    (handler-case
+	(apply #'compile-file path args)
+      (compiler:compiler-note (err)
+	(format *error-output* "Note: ~A ~A~%" (type-of err) err))))
+  (defun repl-save-image (path toplevel)
+    "Saves the Lisp core image to PATH using REPL-COMPILER-TOPLEVEL as the init function."
+    (quiet-compile "sbcl.lisp" :system-p t)
+    (quiet-compile "sbcl-image.lisp" :system-p t)
+    (c:build-program path
+		     :lisp-files '()
+		     :epilogue-code (print `(progn
+					      (,toplevel (ext:command-args))
+					      (si:exit 0))))))
 
 (defun repl-imager-toplevel (args)
   (let* ((mode (second args))
@@ -118,10 +154,17 @@
                           (concatenate 'string mode EXECUTABLE-EXT))))
     (format *error-output* "Saving image for ~A to ~A...~%" mode output-path)
     (case (intern (string-upcase mode) :keyword)
-      (:compiler (repl-save-image output-path #'repl-compiler-toplevel))
-      (:disassembler (repl-save-image output-path #'repl-disasm-toplevel))
+      (:compiler (repl-save-image output-path 'repl-compiler-toplevel))
+      (:disassembler (repl-save-image output-path 'repl-disasm-toplevel))
       (t (format *error-output* "Unknown mode: ~A~%" mode)))))
 
 (eval-when (:load-toplevel :execute)
-  (handler-case (repl-imager-toplevel sb-ext:*posix-argv*)
-    (condition (err) (format *error-output* "Error: ~A~%" err))))
+  ;;#+:ecl (ext:set-limit 'ext:binding-stack (* 2 (ext:get-limit 'ext:binding-stack)))
+  (handler-case (repl-imager-toplevel (remove-shell-args (command-args)))
+    #+:ecl (storage-condition (err)
+	     (format *error-output* "Storage Error: ~A ~A~%" (type-of err) err)
+	     
+	     (continue))
+      #+:ecl (compiler:compiler-note (err)
+	       (format *error-output* "Note: ~A ~A~%" (type-of err) err))
+      (condition (err) (format *error-output* "Error: ~A ~A~%" (type-of err) err))))
