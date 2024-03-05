@@ -2,7 +2,7 @@
 
 (require "runtime/bc/io/console")
 (require "runtime/halt")
-(require "runtime/itoa")
+(require "runtime/convertors/string/itoa")
 (require "runtime/io")
 
 (var *banner* "WELCOME!!")
