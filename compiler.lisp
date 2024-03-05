@@ -969,12 +969,12 @@
 
 #-:repl
 (defun resolve-load-path-ext (path &optional (extensions *load-extensions*))
-  (let ((p1 (merge-pathnames (make-pathname :type (first extensions))
-                             path)))
-    (if (probe-file p1)
-        p1
-        (if extensions
-            (resolve-load-path-ext path (rest extensions))))))
+  (if extensions
+    (let ((p1 (merge-pathnames (make-pathname :type (first extensions))
+                               path)))
+      (if (probe-file p1)
+          p1
+          (resolve-load-path-ext path (rest extensions))))))
 
 #-:repl
 (defun resolve-load-path (path &optional (search-paths *load-path*) (extensions *load-extensions*))
