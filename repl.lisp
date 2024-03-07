@@ -80,10 +80,13 @@
 #+(or :sbcl :ecl)
 (in-package :repl)
 
+(eval-when (:execute)
+;;(require :repl-loader "loader.lisp")
 (require "compiler")
 (require "outputter")
 (require "file-outputter")
 (require "disassembler")
+)
 
 ;;;
 ;;; Compatibility layer functions

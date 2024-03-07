@@ -14,6 +14,7 @@
       (console-write str)
       (multiple-value-bind (req-offset asm-stack env kind value)
           (repl-compile package str (+ str (length str)) asm-stack env env)
+        (console-write ";; => ")
         (console-write-unsigned-integer req-offset 16)
         (console-write-unsigned-integer asm-stack 16)
         (console-write-unsigned-integer env 16)
@@ -33,6 +34,7 @@
   (console-write-unsigned-integer (package-symbols-next-offset package) 16))
 
 (defun with-package (fn &optional args)
+  (console-write "with-package")
   (with-allocation (package 64) ; (package-size)
     (with-allocation (CS 4096)
       (with-allocation (DS 4096)
@@ -41,6 +43,7 @@
             (with-allocation (imports 4096)
               (with-allocation (exports 4096)
                 (with-allocation (source-files 4096)
+                  (console-write "package-init")
                   (package-init package
                                 CS segment-size
                                 DS segment-size

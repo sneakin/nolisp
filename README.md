@@ -26,10 +26,10 @@ Loading
 ```sh
    $ cd $ROOT
    $ sbcl
-   cl> (load "sbcl.lisp")
+   cl> (load "loader.lisp")
 ```
 
-Or in Emacs using Slime, evaluate `sbcl.lisp` with the `slime-eval-buffer` command.
+Or in Emacs using Slime, evaluate `loader.lisp` with the `slime-eval-buffer` command.
 
 Compiling Files
 ---

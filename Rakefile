@@ -17,14 +17,14 @@ directory buildroot
 file buildroot.join("compiler#{EXE_EXT}") => [ *Dir.glob(root.join('*.lisp')), buildroot ] do |t|
   pwd = Dir.pwd
   Dir.chdir(root)
-  sh("#{SBCL} --script sbcl-image.lisp compiler #{Shellwords.escape(t.name)}")
+  sh("#{SBCL} --script cli/sbcl-image.lisp compiler #{Shellwords.escape(t.name)}")
   Dir.chdir(pwd)
 end
 
 file buildroot.join("disassembler#{EXE_EXT}") => [ *Dir.glob(root.join('*.lisp')), buildroot ] do |t|
   pwd = Dir.pwd
   Dir.chdir(root)
-  sh("#{SBCL} --script sbcl-image.lisp disassembler #{Shellwords.escape(t.name)}")
+  sh("#{SBCL} --script cli/sbcl-image.lisp disassembler #{Shellwords.escape(t.name)}")
   Dir.chdir(pwd)
 end
 

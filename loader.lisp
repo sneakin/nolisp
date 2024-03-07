@@ -24,7 +24,7 @@
 
 ;; todo need to also search multiple file directories
 (defconstant *repl-extensions* '("lisp" "nl"))
-(defvar *load-path* (list (pathname-directory ".")))
+(defvar *load-path* (list (pathname-directory ".") (pathname-directory *load-truename*)))
 
 (defun repl-resolve-path (mod-name &optional (extensions *repl-extensions*))
   (if extensions
@@ -42,34 +42,27 @@
         (provide mod-name)
         (error 'repl-load-error :module mod-name :path file-name))))
 
-#+sbcl
 (defun repl-load (&optional reload)
-  (unless (find #'repl-module-loader *module-provider-functions*)
-    (push #'repl-module-loader *module-provider-functions*))
+  (pushnew #'repl-module-loader
+    #+:sbcl *module-provider-functions*
+    #+:ecl ext:*module-provider-functions*)
   (if (and reload (find "REPL" *modules* :test #'string=))
       (setf *modules* nil))
   (require :repl))
 
-#+ecl
-(progn
+(defun repl-reload ()
+  (load "loader.lisp")
+  (repl-load t))
+
+#+:ecl
+(eval-when (:load-toplevel)
   (require '#:package-locks)
   (si:fset 'sys-require #'require)
   (ext:without-package-locks
-      (defun require (mod)))
-  (eval-when (:compile-toplevel :execute)
-    (ext:without-package-locks
-	(defun require (mod)
-	  (unless (find mod *modules* :test #'string=)
-	    (handler-case (repl-module-loader mod)
-	      (repl-module-not-found-error (_) (sys-require mod)))))))
-  (defun repl-load (&optional reload)
-    (if (and reload (find "REPL" *modules* :test #'string=))
-	(setf *modules* nil))
-    (require :repl)))
-
-(defun repl-reload ()
-  (load "sbcl.lisp")
-  (repl-load t))
+    (defun require (mod &rest paths) (format *error-output* "Not requiring ~A~%" mod))))
 
 (eval-when (:load-toplevel :execute)
   (repl-load))
+;;(repl-load)
+
+(provide :repl-loader)
