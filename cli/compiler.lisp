@@ -1,6 +1,8 @@
-(require :repl-loader "loader.lisp")
-(require "logging")
-(require "cli/arguments")
+#-:ecl
+(eval-when (:execute :load-toplevel)
+  (require :repl-loader "loader.lisp")
+  (require "logging")
+  (require "cli/arguments"))
 
 (define-condition no-input-files-error (simple-error)
   ()

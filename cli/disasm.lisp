@@ -1,3 +1,4 @@
+#-:ecl
 (eval-when (:execute :load-toplevel)
   (require :repl-loader "loader.lisp")
   (require "logging")

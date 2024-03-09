@@ -1,6 +1,6 @@
 ;;; -*- mode: Lisp; coding: utf-8-unix -*-
 
-#+:sbcl
+#-:repl
 (in-package :repl)
 
 (require "cpu")
@@ -20,10 +20,10 @@
 (defvar *SIZEOF_ULONG64* 8)
 (defvar *SIZEOF_FLOAT* 4)
 
-#+:sbcl (require "conditions")
+#-:repl (require "conditions")
 #+:repl (require "runtime/error")
 
-#+:sbcl
+#-:repl
 (define-condition unknown-data-type-error (repl-error)
   ((type :initarg :type))
   (:report (lambda (condition stream)

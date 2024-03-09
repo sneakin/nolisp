@@ -24,7 +24,7 @@
 
 ;; todo need to also search multiple file directories
 (defconstant *repl-extensions* '("lisp" "nl"))
-(defvar *load-path* (list (pathname-directory ".") (pathname-directory *load-truename*)))
+(defvar *load-path* (list (pathname-directory ".") (if *load-truename* (pathname-directory *load-truename*))))
 
 (defun repl-resolve-path (mod-name &optional (extensions *repl-extensions*))
   (if extensions
@@ -56,10 +56,10 @@
 
 #+:ecl
 (eval-when (:load-toplevel)
-  (require '#:package-locks)
+  (require :package-locks)
   (si:fset 'sys-require #'require)
   (ext:without-package-locks
-    (defun require (mod &rest paths) (format *error-output* "Not requiring ~A~%" mod))))
+    (defmacro require (mod &rest paths) (format *error-output* "Not requiring ~A~%" mod))))
 
 (eval-when (:load-toplevel :execute)
   (repl-load))
